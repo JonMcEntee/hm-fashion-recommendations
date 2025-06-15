@@ -1,6 +1,6 @@
 # H\&M Fashion Recommendations
 
-<img src="https://upload.wikimedia.org/wikipedia/commons/5/53/H%26M-Logo.svg" width="40%" height="40%">
+<img src="H%26M-Logo.svg" width="40%" height="40%">
 
 ## Overview
 
