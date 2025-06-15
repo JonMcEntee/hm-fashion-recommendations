@@ -4,13 +4,12 @@
 
 ## Overview
 
-This repository contains [a Jupyter Notebook](https://github.com/JonMcEntee/hm-fashion-recommendations/blob/main/H%26M_Fashion_Recommendations.ipynb) for building a product recommendation system using collaborative filtering. It was developed as part of the [H\&M Personalized Fashion Recommendations Kaggle competition](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations).
+This repository contains [a Jupyter Notebook](https://github.com/JonMcEntee/hm-fashion-recommendations/blob/main/H%26M_Fashion_Recommendations.ipynb) for building a product recommendation system. It was developed as part of the [H\&M Personalized Fashion Recommendations Kaggle competition](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations).
 
 The notebook presents an approach to predict a customer’s next likely fashion purchases using:
 
 * **Collaborative filtering** with the Implicit Alternating Least Squares (ALS) algorithm
-* **Sparse matrix representations** of user-item interactions
-* **Temporal filtering** of transactions to prioritize recent activity
+* **Ranking by Gradient Boosted Trees** using the LightGBM Framework
 
 Key datasets used:
 
@@ -26,17 +25,17 @@ Key datasets used:
    * Weekly transaction aggregation
    * Time-based user behavior exploration
 
-2. **Modeling Approach**
+2. **ALS Modeling Approach**
 
    * Implicit ALS training on a user-item interaction matrix
    * Use of transaction frequency as implicit feedback
    * Tuning latent factors and regularization parameters
 
-3. **Recommendation System**
+3. **LightGBM Ranker Approach**
 
-   * Ranked product predictions per user
-   * Filtering of already-purchased items from recommendations
-   * Weekly-based train/test split for offline evaluation
+   * Generates recommendation based on simple heuristics
+   * Produces trainable features on the data
+   * Ranks using a Gradient Boosted Tree algorithm
 
 ## Requirements
 
@@ -56,24 +55,12 @@ Install dependencies with:
 pip install pandas numpy scipy scikit-learn matplotlib seaborn implicit
 ```
 
-## Usage
-
-1. Upload the H\&M dataset to your Google Drive
-2. Mount Google Drive in Colab
-3. Run the notebook cells sequentially to:
-
-   * Load and preprocess data
-   * Train an ALS recommendation model
-   * Generate top-N item predictions per user
-
 ## Key Findings
 
-* Implicit ALS performs well for large-scale retail data with implicit feedback
 * Recent transaction activity is more predictive than older data
-* Matrix factorization enables scalable personalization without needing item content
+* Implicit ALS performs well for large-scale retail data with implicit feedback
 
 ## Acknowledgments
 
 * Kaggle for organizing the competition
 * H\&M Group for providing real-world retail data
-* The `implicit` library team for the ALS implementation
