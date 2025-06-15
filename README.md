@@ -41,7 +41,7 @@ Key datasets used:
 
 The notebook requires the following Python packages:
 
-* pandas,
+* pandas
 * numpy
 * scipy
 * scikit-learn
