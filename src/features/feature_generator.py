@@ -22,8 +22,16 @@ class FeatureGenerator:
         self.article_to_product = {
             article: product for article, product in zip(articles.article_id, articles.product_code)
         }
+
+        self.article_to_group = {
+            article: group for article, group in zip(articles.article_id, articles.product_group_name)
+        }
+
         self.product_code_map = articles.groupby('product_code')['article_id'].agg(list).to_dict()
         
+        self.train_data["product_code"] = self.train_data["article_id"].map(self.article_to_product)
+        self.train_data["product_group_name"] = self.train_data["article_id"].map(self.article_to_group)
+
         # Precompute customer history
         self.customer_history_pairs = defaultdict(list)
         for _, row in train_data.iterrows():
@@ -45,6 +53,9 @@ class FeatureGenerator:
         article_weeks = self._generate_article_features(samples)
         
         features = customer_rows.merge(article_weeks, on=["article_id", "week"], how="left")
+        print(f"features columns: {features.columns}")
+        print(f"article_weeks columns: {article_weeks.columns}")
+        print(f"customer_rows columns: {customer_rows.columns}")
         features = self._add_percentage_features(features)
         
         samples = samples.merge(features, on=["customer_id", "article_id", "week"], how="left")
@@ -117,3 +128,48 @@ class FeatureGenerator:
             if purchase[0] < week:
                 return week - purchase[0]
         return np.nan 
+
+# Test the feature generator
+if __name__ == "__main__":
+    # Load data
+    print("Loading data...")
+    directory = "data/"
+    articles = pd.read_csv(directory + "articles.csv")
+    customers = pd.read_csv(directory + "customers.csv")
+    transactions = pd.read_csv(directory + "transactions_sample.csv",
+                             parse_dates=['t_dat'])
+    
+    # Add week column for temporal split
+    print("Preparing data...")
+    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
+    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
+    
+    # Split data into train and validation sets
+    print("Splitting data...")
+    train = transactions[transactions.week < last_week - 1].reset_index(drop=True)
+    validation = transactions[transactions.week == last_week - 1].reset_index(drop=True)
+    
+    # Initialize feature generator
+    print("Initializing feature generator...")
+    feature_generator = FeatureGenerator(train, articles, customers)
+    
+    # Generate features for validation set
+    print("Generating features...")
+    validation_features = feature_generator.generate_features(validation)
+    
+    # Print feature summary
+    print("\nFeature Summary:")
+    print(f"Number of samples: {len(validation_features)}")
+    print("\nFeature columns:")
+    for col in validation_features.columns:
+        print(f"- {col}")
+    
+    # Print sample of generated features
+    print("\nSample of generated features:")
+    print(validation_features.head())
+    
+    # Save features to CSV
+    output_path = "data/validation_features.csv"
+    print(f"\nSaving features to {output_path}...")
+    validation_features.to_csv(output_path, index=False)
+    print("Done!") 
