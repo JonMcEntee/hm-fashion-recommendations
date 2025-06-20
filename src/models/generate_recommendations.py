@@ -81,7 +81,7 @@ def create_weekly_bestsellers_recommender(
     return weekly_bestsellers
 
 #%%
-def create_customer_item_recommender(
+def create_previous_purchases(
     transactions: pd.DataFrame,
 ) -> Callable[[List[str], int], pd.DataFrame]:
     """
@@ -99,14 +99,14 @@ def create_customer_item_recommender(
     
     Returns:
         Callable[[List[str], int], pd.DataFrame]:
-            A function (customer_item_recommender) that takes a list of customer IDs and a week number,
+            A function (previous_purchases) that takes a list of customer IDs and a week number,
             and returns a DataFrame with columns:
                 - customer_id: Customer identifier
                 - article_id: Article identifiers the customer has interacted with
-            Each row represents a unique customer-article interaction up to the specified week.
+            Each row represents a the unique articles purchased by the customer up to the specified week.
     
     Usage:
-        recommender = create_customer_item_recommender(transactions_df)
+        recommender = create_previous_purchases(transactions_df)
         customer_history = recommender(['customer1', 'customer2'], week=10)
     """
     # Convert transaction dates to week numbers relative to the last week
@@ -116,7 +116,7 @@ def create_customer_item_recommender(
     # Create a clean copy with only needed columns to minimize memory usage
     transactions = transactions[['customer_id', 'week', 'article_id']].copy()
 
-    def customer_item_recommender(customers: List[str], week: int, k: int = 12) -> pd.DataFrame:
+    def previous_purchases(customers: List[str], week: int, k: int = 12) -> pd.DataFrame:
         """
         Retrieve the historical item interactions for specified customers up to a given week.
 
@@ -134,7 +134,7 @@ def create_customer_item_recommender(
                 and including the specified week.
 
         Usage:
-            recommender = create_customer_item_recommender(train_df)
+            recommender = create_previous_purchases(train_df)
             customer_history = recommender(['customer1', 'customer2'], week=10)
         """
         # Filter transactions for the specified customers
@@ -148,7 +148,71 @@ def create_customer_item_recommender(
         
         return filtered_history
     
-    return customer_item_recommender
+    return previous_purchases
+
+
+def create_same_product_code(
+    articles: pd.DataFrame,
+) -> Callable[[pd.DataFrame], pd.DataFrame]:
+    """
+    Create a function that finds all articles sharing the same product code as a customer's previous purchases.
+
+    This function builds an index mapping each article to its product code. The returned function
+    takes a DataFrame of previous purchases and returns all articles that share a product code
+    with any of those purchases. This is useful for generating recommendations of similar items
+    (e.g., different colors or styles of the same product).
+
+    Parameters:
+        articles (pd.DataFrame): DataFrame containing article metadata. Must include columns:
+            - article_id: Unique identifier for each article
+            - product_code: Product code grouping similar articles
+
+    Returns:
+        Callable[[pd.DataFrame], pd.DataFrame]:
+            A function (same_product_code) that takes a DataFrame of previous purchases (with column 'article_id')
+            and returns a DataFrame of articles sharing the same product code.
+
+    Usage:
+        same_code_finder = create_same_product_code(articles_df)
+        similar_articles = same_code_finder(previous_purchases_df)
+    """
+    # Build an index mapping each article to its product code
+    index = articles[['article_id', 'product_code']].copy()
+
+    def same_product_code(previous_purchases: pd.DataFrame) -> pd.DataFrame:
+        """
+        Find all articles that share a product code with the given previous purchases.
+
+        Parameters:
+            previous_purchases (pd.DataFrame): DataFrame with at least an 'article_id' column,
+                representing articles previously purchased by a customer.
+
+        Returns:
+            pd.DataFrame: DataFrame of articles that share a product code with any article in previous_purchases.
+                Columns:
+                    - customer_id: Customer identifier
+                    - article_id: Article sharing a product code with previous purchases
+
+        Usage:
+            similar_articles = same_code_finder(previous_purchases_df)
+        """
+        # Merge previous purchases with the index to get their product codes
+        previous_purchases = previous_purchases.copy()
+        previous_purchases = (
+            previous_purchases
+            .merge(index, on='article_id', how='inner') # Add product_code to previous purchases
+            .drop(columns=['article_id'], axis=1)       # Remove article_id, keep product_code
+            .drop_duplicates()                          # Remove duplicate product codes
+        )
+        # Find all articles that share any of these product codes
+        same_code = (
+            index
+            .merge(previous_purchases, on='product_code', how='inner') # Find all articles with these product codes
+            .drop(columns=['product_code'], axis=1)                    # Remove product_code for output
+        )
+        return same_code
+
+    return same_product_code
 
 
 #%%
@@ -159,7 +223,7 @@ if __name__ == "__main__":
     transactions = pd.read_csv(directory + "transactions_sample.csv", parse_dates=['t_dat'])
     customers = transactions['customer_id'].unique().tolist()[:1000]
     print("Creating heuristic recommender...")
-    # recommender = create_customer_item_recommender(transactions)
+    # recommender = create_previous_purchases(transactions)
     print("Generating recommendations for customers...")
 
 # %%

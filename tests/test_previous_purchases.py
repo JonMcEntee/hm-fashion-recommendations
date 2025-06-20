@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from src.models.generate_recommendations import create_customer_item_recommender
+from src.models.generate_recommendations import create_previous_purchases
 
 @pytest.fixture
 def sample_transactions():
@@ -27,7 +27,7 @@ def sample_transactions():
 
 def test_basic_functionality(sample_transactions):
     """Test basic functionality of the customer item recommender."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     # Get history for customer C1 at week 1
     result = recommender(['C1'], week=1)
@@ -46,7 +46,7 @@ def test_basic_functionality(sample_transactions):
 
 def test_week_filtering(sample_transactions):
     """Test that only transactions up to the specified week are included."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     # Test different weeks for the same customer
     week0 = recommender(['C1'], week=0)
@@ -64,7 +64,7 @@ def test_week_filtering(sample_transactions):
 
 def test_multiple_customers(sample_transactions):
     """Test retrieving history for multiple customers."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     # Get history for both customers at week 2
     result = recommender(['C1', 'C2'], week=2)
@@ -81,7 +81,7 @@ def test_multiple_customers(sample_transactions):
 
 def test_duplicate_purchases(sample_transactions):
     """Test that duplicate purchases are handled correctly (deduplicated)."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     # C1 bought A3 twice in week 1
     result = recommender(['C1'], week=1)
@@ -92,7 +92,7 @@ def test_duplicate_purchases(sample_transactions):
 
 def test_nonexistent_customer(sample_transactions):
     """Test behavior with non-existent customer."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     result = recommender(['NONEXISTENT'], week=1)
     
@@ -103,7 +103,7 @@ def test_nonexistent_customer(sample_transactions):
 
 def test_empty_customer_list(sample_transactions):
     """Test behavior with empty customer list."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     result = recommender([], week=1)
     
@@ -114,7 +114,7 @@ def test_empty_customer_list(sample_transactions):
 
 def test_future_week(sample_transactions):
     """Test behavior when requesting a future week."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     # Request week beyond the data
     result = recommender(['C1'], week=10)
@@ -124,7 +124,7 @@ def test_future_week(sample_transactions):
 
 def test_negative_week(sample_transactions):
     """Test behavior with negative week number."""
-    recommender = create_customer_item_recommender(sample_transactions)
+    recommender = create_previous_purchases(sample_transactions)
     
     result = recommender(['C1'], week=-1)
     
