@@ -144,7 +144,10 @@ def create_previous_purchases(
         filtered_history = filtered_history[filtered_history['week'] <= week]
         
         # Get unique customer-article pairs and create a clean copy
-        filtered_history = filtered_history[['customer_id', 'article_id']].drop_duplicates().copy()
+        filtered_history = filtered_history[['customer_id', 'article_id']]\
+            .drop_duplicates()\
+            .copy()\
+            .rename(columns={'article_id': 'recommendation'})
         
         return filtered_history
     
@@ -176,8 +179,11 @@ def create_same_product_code(
         same_code_finder = create_same_product_code(articles_df)
         similar_articles = same_code_finder(previous_purchases_df)
     """
+
     # Build an index mapping each article to its product code
-    index = articles[['article_id', 'product_code']].copy()
+    index = articles[['article_id', 'product_code']]\
+        .copy()\
+        .rename(columns={'article_id': 'recommendation'})
 
     def same_product_code(previous_purchases: pd.DataFrame) -> pd.DataFrame:
         """
@@ -200,8 +206,8 @@ def create_same_product_code(
         previous_purchases = previous_purchases.copy()
         previous_purchases = (
             previous_purchases
-            .merge(index, on='article_id', how='inner') # Add product_code to previous purchases
-            .drop(columns=['article_id'], axis=1)       # Remove article_id, keep product_code
+            .merge(index, on='recommendation', how='inner') # Add product_code to previous purchases
+            .drop(columns=['recommendation'], axis=1)       # Remove article_id, keep product_code
             .drop_duplicates()                          # Remove duplicate product codes
         )
         # Find all articles that share any of these product codes
@@ -213,17 +219,91 @@ def create_same_product_code(
         return same_code
 
     return same_product_code
+#%%
+def create_recommendation_generator(
+    transactions: pd.DataFrame,
+    articles: pd.DataFrame
+) -> Callable[[List[str], int, int], pd.DataFrame]:
+    """
+    Create a hybrid recommendation generator that combines multiple heuristics and models.
 
+    This function initializes several recommender systems (baseline, temporal, ALS, previous purchases,
+    same product code, and weekly bestsellers) using the provided transaction and article data. It returns
+    a function that, for a given list of customers, week, and k, generates a set of candidate recommendations
+    by aggregating the outputs of all these recommenders and removing duplicates.
 
+    Parameters:
+        transactions (pd.DataFrame): Transaction data. Must include columns required by each recommender.
+        articles (pd.DataFrame): Article metadata. Must include columns required by each recommender.
+
+    Returns:
+        Callable[[List[str], int, int], pd.DataFrame]:
+            A function (recommendation_generator) that takes a list of customer IDs, a week number, and k,
+            and returns a DataFrame with columns:
+                - customer_id: Customer ID
+                - recommendation: Article ID of the recommended item
+            The recommendations are aggregated from all underlying recommenders and deduplicated.
+
+    Usage:
+        recommender = create_recommendation_generator(transactions_df, articles_df)
+        recommendations = recommender([customer1, customer2], week=10, k=12)
+    """
+    # Initialize all base recommenders
+    baseline_recommender = create_baseline_recommender(transactions)
+    temporal_baseline = create_temporal_baseline(transactions)
+    als_recommender = create_als_recommender(transactions)
+    previous_purchases = create_previous_purchases(transactions)
+    same_product_code = create_same_product_code(articles)
+    weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
+
+    def recommendation_generator(customers: List[str], week: int, k: int = 12) -> pd.DataFrame:
+        """
+        Generate a set of candidate recommendations for a list of customers by aggregating multiple recommenders.
+
+        Parameters:
+            customers (List[str]): List of customer IDs to generate recommendations for.
+            week (int): The week number for which to generate recommendations.
+            k (int): Number of recommendations per customer for each recommender (default: 12).
+
+        Returns:
+            pd.DataFrame: DataFrame with columns:
+                - customer_id: Customer ID
+                - recommendation: Article ID of the recommended item
+            The DataFrame contains deduplicated recommendations aggregated from all recommenders.
+
+        Usage:
+            recommender = create_recommendation_generator(transactions_df, articles_df)
+            recommendations = recommender([customer1, customer2], week=10, k=12)
+        """
+        # Get previous purchases for the customers up to the given week
+        previous_purchases_df = previous_purchases(customers, week, k=k)
+        # Aggregate recommendations from all recommenders
+        recommendations = pd.concat([
+            baseline_recommender(customers, k=k),
+            temporal_baseline(customers, k=k),
+            als_recommender(customers, k=k),
+            previous_purchases_df,
+            same_product_code(previous_purchases_df),
+            weekly_bestsellers(customers, week, k=k)
+        ])
+        # Remove duplicate recommendations and drop the 'rank' column if present
+        recommendations = recommendations.drop_duplicates()
+        if 'rank' in recommendations.columns:
+            recommendations = recommendations.drop(columns=['rank'], axis=1)
+        return recommendations
+
+    return recommendation_generator
 #%%
 if __name__ == "__main__":
     # Example usage
     print("Loading data...")
     directory = "data/"
     transactions = pd.read_csv(directory + "transactions_sample.csv", parse_dates=['t_dat'])
+    articles = pd.read_csv(directory + "articles.csv")
     customers = transactions['customer_id'].unique().tolist()[:1000]
-    print("Creating heuristic recommender...")
-    # recommender = create_previous_purchases(transactions)
-    print("Generating recommendations for customers...")
+    print("Finished loading data")
 
+    recommender = create_recommendation_generator(transactions, articles)
+    recommendations = recommender(customers, week=10, k=12)
+    print(recommendations)
 # %%
