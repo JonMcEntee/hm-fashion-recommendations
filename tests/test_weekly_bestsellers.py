@@ -21,7 +21,7 @@ def sample_transactions():
     data = {
         't_dat': dates,
         'customer_id': ['C1', 'C2', 'C1', 'C2', 'C3', 'C1'],
-        'article_id': ['A1', 'A1', 'A2', 'A3', 'A2', 'A4']
+        'article_id': [1001, 1001, 1002, 1003, 1002, 1004]
     }
     return pd.DataFrame(data)
 
@@ -55,21 +55,21 @@ def test_bestsellers_week_isolation(sample_transactions):
     # Should only consider items from week 0
     recommendations = recommender(['C1'], week=1, k=1)
     
-    # In week 0, only A1 was purchased
-    assert recommendations['recommendation'].iloc[0] == 'A1'
+    # In week 0, only 1001 was purchased
+    assert recommendations['recommendation'].iloc[0] == 1001
 
 def test_bestsellers_ranking(sample_transactions):
     """Test that items are ranked by popularity."""
     recommender = create_weekly_bestsellers_recommender(sample_transactions)
     
     # Get recommendations for week 2
-    # In week 1: A2 appears twice, A3 appears once
+    # In week 1: 1002 appears twice, 1003 appears once
     recommendations = recommender(['C1'], week=2, k=2)
     
-    # First recommendation should be A2 (most popular in week 1)
-    assert recommendations.iloc[0]['recommendation'] == 'A2'
-    # Second recommendation should be A3
-    assert recommendations.iloc[1]['recommendation'] == 'A3'
+    # First recommendation should be 1002 (most popular in week 1)
+    assert recommendations.iloc[0]['recommendation'] == 1002
+    # Second recommendation should be 1003
+    assert recommendations.iloc[1]['recommendation'] == 1003
 
 def test_bestsellers_empty_week(sample_transactions):
     """Test behavior when requesting recommendations for a week with no prior data."""
@@ -105,4 +105,41 @@ def test_bestsellers_multiple_customers(sample_transactions):
     c1_recs = recommendations[recommendations['customer_id'] == 'C1']['recommendation'].tolist()
     for cust in customers[1:]:
         cust_recs = recommendations[recommendations['customer_id'] == cust]['recommendation'].tolist()
-        assert c1_recs == cust_recs 
+        assert c1_recs == cust_recs
+
+def test_bestsellers_data_types(sample_transactions):
+    """Test that output DataFrame columns have correct data types for all weeks."""
+    recommender = create_weekly_bestsellers_recommender(sample_transactions)
+    
+    customers = ['C1', 'C2']
+    k = 2
+    
+    # Test for multiple weeks including week 0
+    test_weeks = [1, 2]
+    
+    for week in test_weeks:
+        recommendations = recommender(customers, week=week, k=k)
+        
+        # Check that DataFrame is returned
+        assert isinstance(recommendations, pd.DataFrame)
+        
+        # Check column names
+        expected_columns = {'customer_id', 'rank', 'recommendation'}
+        assert set(recommendations.columns) == expected_columns
+        
+        # Check data types
+        assert recommendations['customer_id'].dtype == 'object', f"customer_id should be object type for week {week}"
+        assert recommendations['rank'].dtype in ['int64', 'int32'], f"rank should be integer type for week {week}"
+        
+        # Check recommendation column data type - should be integer for numeric article_ids
+        if len(recommendations) > 0:
+            assert recommendations['recommendation'].dtype in ['int64', 'int32'], f"recommendation should be integer type for week {week}"
+        
+        # Additional check: ensure no float values in recommendation column
+        if len(recommendations) > 0:
+            recommendations_list = recommendations['recommendation'].tolist()
+            for rec in recommendations_list:
+                # Check that recommendations are integers, not floats
+                assert isinstance(rec, int), f"Recommendation {rec} should be integer, not float for week {week}"
+                # Ensure no .0 suffix by checking the value equals its integer conversion
+                assert rec == int(rec), f"Recommendation {rec} should be integer, not float for week {week}" 
