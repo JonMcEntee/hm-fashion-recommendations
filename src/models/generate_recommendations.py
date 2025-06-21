@@ -222,7 +222,8 @@ def create_same_product_code(
 #%%
 def create_recommendation_generator(
     transactions: pd.DataFrame,
-    articles: pd.DataFrame
+    articles: pd.DataFrame,
+    als_variables: dict = None
 ) -> Callable[[List[str], int, int], pd.DataFrame]:
     """
     Create a hybrid recommendation generator that combines multiple heuristics and models.
@@ -249,9 +250,19 @@ def create_recommendation_generator(
         recommendations = recommender([customer1, customer2], week=10, k=12)
     """
     # Initialize all base recommenders
+    if als_variables is None:
+        als_recommender = create_als_recommender(transactions)
+    else:
+        als_recommender = create_als_recommender(
+            als_model=als_variables['als_model'],
+            user_map=als_variables['user_map'],
+            item_map=als_variables['item_map'],
+            reverse_item_map=als_variables['reverse_item_map'],
+            item_user_matrix=als_variables['item_user_matrix']
+        )
+
     baseline_recommender = create_baseline_recommender(transactions)
     temporal_baseline = create_temporal_baseline(transactions)
-    als_recommender = create_als_recommender(transactions)
     previous_purchases = create_previous_purchases(transactions)
     same_product_code = create_same_product_code(articles)
     weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
@@ -295,15 +306,19 @@ def create_recommendation_generator(
     return recommendation_generator
 #%%
 if __name__ == "__main__":
+    import pickle
+
     # Example usage
     print("Loading data...")
     directory = "data/"
     transactions = pd.read_csv(directory + "transactions_sample.csv", parse_dates=['t_dat'])
     articles = pd.read_csv(directory + "articles.csv")
     customers = transactions['customer_id'].unique().tolist()[:1000]
-    print("Finished loading data")
-
-    recommender = create_recommendation_generator(transactions, articles)
+    print("Loading ALS variables...")
+    als_variables = pickle.load(open("saved_models/train_als_model_variables.pkl", "rb"))
+    print("Creating recommender...")
+    recommender = create_recommendation_generator(transactions, articles, als_variables)
+    print("Generating recommendations...")
     recommendations = recommender(customers, week=10, k=12)
     print(recommendations)
 # %%
