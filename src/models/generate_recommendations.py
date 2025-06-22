@@ -141,7 +141,7 @@ def create_previous_purchases(
         filtered_history = transactions[(transactions['customer_id'].isin(customers))]
         
         # Only include interactions up to the specified week
-        filtered_history = filtered_history[filtered_history['week'] <= week]
+        filtered_history = filtered_history[filtered_history['week'] < week]
         
         # Get unique customer-article pairs and create a clean copy
         filtered_history = filtered_history[['customer_id', 'article_id']]\
@@ -228,7 +228,7 @@ def create_recommendation_generator(
     Create a hybrid recommendation generator that combines multiple heuristics and models.
 
     This function initializes several recommender systems (baseline, temporal, ALS, previous purchases,
-    same product code, and weekly bestsellers) using the provided transaction and article data. It returns
+    same product code, weekly bestsellers, and time-weighted bestsellers) using the provided transaction and article data. It returns
     a function that, for a given list of customers, week, and k, generates a set of candidate recommendations
     by aggregating the outputs of all these recommenders and removing duplicates.
 
@@ -278,7 +278,7 @@ def create_recommendation_generator(
         recommendations = pd.concat([
             previous_purchases_df,
             same_product_code(previous_purchases_df),
-            weekly_bestsellers(customers, week, k=k)
+            weekly_bestsellers(customers, week, k=k),
         ])
         # Remove duplicate recommendations and drop the 'rank' column if present
         recommendations = recommendations.drop_duplicates()
@@ -290,22 +290,26 @@ def create_recommendation_generator(
 #%%
 if __name__ == "__main__":
     import pickle
+    from tqdm import tqdm
 
     # Example usage
     print("Loading data...")
     directory = "data/"
     transactions = pd.read_csv(directory + "transactions_train.csv", parse_dates=['t_dat'])
     articles = pd.read_csv(directory + "articles.csv")
-    customers = transactions['customer_id'].unique().tolist()[:1000]
 
     print("Creating recommender...")
     recommender = create_recommendation_generator(transactions, articles)
 
+    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
+    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
+
     print("Generating recommendations...")
-    for week in range(0, 105):
+    for week in tqdm(range(1, 105)):
+        customers = transactions[transactions['week'] == week]['customer_id'].unique().tolist()
         recommendations = recommender(customers, week=week, k=12)
         recommendations["week"] = week
-        if week == 0:
+        if week == 1:
             recommendations.to_csv("data/recommendations.csv", index=False)
         else:
             recommendations.to_csv("data/recommendations.csv", mode="a", header=False, index=False)
