@@ -6,54 +6,67 @@ os.chdir(project_root)
 
 #%%
 import pandas as pd
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from typing import Callable
 
-#%%
-transactions = pd.read_csv("data/transactions_sample.csv", parse_dates=['t_dat'])
-articles = pd.read_csv("data/articles.csv")
-customers = pd.read_csv("data/customers.csv")
-
-#%%
-# chose 35 days as the larger window because it is a multiple of 7.
-# This prevents overlap and leakage.
-windows = [7, 35]
-
-for window in windows:
-    last = (transactions.t_dat.max() - transactions.t_dat.min()).days // window
-    transactions[f'{window}d'] = last - (transactions.t_dat.max() - transactions.t_dat).dt.days // window
-
-window_cols = [f'{window}d' for window in windows]
-
-transactions = transactions\
-    .merge(articles[['article_id', 'prod_name', 'product_group_name']], on="article_id", how="left")\
-    .merge(customers[['customer_id', 'age']], on="customer_id", how="left")
-
-#%%
-Feature = namedtuple("Feature", ["agg", "column", "by", "time_col"])
+Feature = namedtuple("Feature", ["agg", "column", "by"])
 DerivativeFeature = namedtuple("DerivativeFeature", ["feature_1", "feature_2", "function"])
 
 class FeatureGenerator:
-    def __init__(self, features: dict[str, Feature], derivative_features: dict[str, DerivativeFeature], derivative_functions: dict[str, Callable]):
+    def __init__(
+        self, 
+        features: dict[str, Feature],
+        derivative_features: dict[str, DerivativeFeature],
+        derivative_functions: dict[str, Callable]
+    ):
         self.features = features
         self.derivative_features = derivative_features
         self.derivative_functions = derivative_functions
         self.feature_dictionary = {}
 
-    def fit(self, transactions: pd.DataFrame, articles: pd.DataFrame, customers: pd.DataFrame):
+    def fit(self, transactions: pd.DataFrame, articles: pd.DataFrame, customers: pd.DataFrame, verbose: bool = False):
         
+        temp = {}
+        same_merge_columns = defaultdict(list)
         for feature_name, feature in self.features.items():
-            self.feature_dictionary[feature_name] = self.get_transactions_aggs(
-            transactions,
-            feature_name,
-            feature.column,
-            feature.time_col,
-            feature.by,
-            feature.agg
-        )
+            if verbose:
+                print(f" Calculating {feature_name}...")
+            temp[feature_name] = self.get_transactions_aggs(
+                transactions,
+                feature_name,
+                feature.column,
+                feature.by,
+                feature.agg
+            )
+            same_merge_columns[feature.by].append(feature_name)
+        
+        for by, columns in same_merge_columns.items():
+            df = None
+            for column in columns:
+                if verbose:
+                    print(f" Merging {column}...")
+                if df is None:
+                    df = temp[column]
+                else:
+                    df = df.merge(temp[column], on=by, how="left")
+                
+            self.feature_dictionary[by] = df
     
-    def transform(self, transactions: pd.DataFrame, articles: pd.DataFrame, customers: pd.DataFrame):
-        pass
+    def transform(self, recommendations: pd.DataFrame, verbose: bool = False):
+        for by, df in self.feature_dictionary.items():
+            if verbose:
+                print(f" Merging group {by}...")
+            recommendations = recommendations.merge(df, on=by, how="left")
+
+        for feature_name, feature in self.derivative_features.items():
+            if verbose:
+                print(f" Calculating Derivative Feature {feature_name}...")
+            recommendations[feature_name] = self.derivative_functions[feature.function](
+                recommendations[feature.feature_1],
+                recommendations[feature.feature_2]
+            )
+        
+        return recommendations
 
     # Transactions counts
     def get_transactions_aggs(
@@ -61,7 +74,6 @@ class FeatureGenerator:
         transactions: pd.DataFrame,
         feature_name: str,
         column: str,
-        time_col: str,
         by: list[str] = [],
         agg: str = 'count'
         ) -> pd.DataFrame:
@@ -79,7 +91,7 @@ class FeatureGenerator:
             transactions[column] = 1
 
         column_customer_agg = transactions\
-            .groupby([*by, time_col])[column]\
+            .groupby(list(by))[column]\
             .agg(agg)\
             .reset_index(name=feature_name)
         
@@ -89,47 +101,41 @@ class FeatureGenerator:
 transaction_count_groups = ['article_id', 'prod_name', 'product_group_name']
 
 features = {
-    "article_sales_by_week" : Feature(column=None, time_col="7d", by=("article_id",), agg="count"),
-    "article_sales_by_month" : Feature(column=None, time_col="35d", by=("article_id",), agg="count"),
-    "product_sales_by_week" : Feature(column=None, time_col="7d", by=("prod_name",), agg="count"),
-    "product_sales_by_month" : Feature(column=None, time_col="35d", by=("prod_name",), agg="count"),
-    "group_sales_by_week" : Feature(column=None, time_col="7d", by=("product_group_name",), agg="count"),
-    "group_sales_by_month" : Feature(column=None, time_col="35d", by=("product_group_name",), agg="count"),
-    "article_purchases_by_week" : Feature(column=None, time_col="7d", by=("article_id", "customer_id"), agg="count"),
-    "article_purchases_by_month" : Feature(column=None, time_col="35d", by=("article_id", "customer_id"), agg="count"),
-    "product_purchases_by_week" : Feature(column=None, time_col="7d", by=("prod_name", "customer_id"), agg="count"),
-    "product_purchases_by_month" : Feature(column=None, time_col="35d", by=("prod_name", "customer_id"), agg="count"),
-    "group_purchases_by_week" : Feature(column=None, time_col="7d", by=("product_group_name", "customer_id"), agg="count"),
-    "group_purchases_by_month" : Feature(column=None, time_col="35d", by=("product_group_name", "customer_id"), agg="count"),
-    "age_mean_by_week" : Feature(column="age", time_col="7d", by=("article_id",), agg="mean"),
-    "age_mean_by_month" : Feature(column="age", time_col="35d", by=("article_id",), agg="mean"),
-    "age_std_by_week" : Feature(column="age", time_col="7d", by=("article_id",), agg="std"),
-    "age_std_by_month" : Feature(column="age", time_col="35d", by=("article_id",), agg="std"),
-    "age_min_by_week" : Feature(column="age", time_col="7d", by=("article_id",), agg="min"),
-    "age_min_by_month" : Feature(column="age", time_col="35d", by=("article_id",), agg="min"),
-    "age_max_by_week" : Feature(column="age", time_col="7d", by=("article_id",), agg="max"),
-    "age_max_by_month" : Feature(column="age", time_col="35d", by=("article_id",), agg="max"),
-    "price_mean_by_week" : Feature(column="price", time_col="7d", by=("article_id",), agg="mean"),
-    "price_mean_by_month" : Feature(column="price", time_col="35d", by=("article_id",), agg="mean"),
-    "price_std_by_week" : Feature(column="price", time_col="7d", by=("article_id",), agg="std"),
-    "price_std_by_month" : Feature(column="price", time_col="35d", by=("article_id",), agg="std"),
-    "price_min_by_week" : Feature(column="price", time_col="7d", by=("article_id",), agg="min"),
-    "price_min_by_month" : Feature(column="price", time_col="35d", by=("article_id",), agg="min"),
-    "price_max_by_week" : Feature(column="price", time_col="7d", by=("article_id",), agg="max"),
-    "customer_price_mean_by_week" : Feature(column="price", time_col="7d", by=("customer_id",), agg="mean"),
-    "customer_price_mean_by_month" : Feature(column="price", time_col="35d", by=("customer_id",), agg="mean"),
-    "customer_price_std_by_week" : Feature(column="price", time_col="7d", by=("customer_id",), agg="std"),
-    "customer_price_std_by_month" : Feature(column="price", time_col="35d", by=("customer_id",), agg="std"),
-    "customer_price_min_by_week" : Feature(column="price", time_col="7d", by=("customer_id",), agg="min"),
-    "customer_price_min_by_month" : Feature(column="price", time_col="35d", by=("customer_id",), agg="min"),
-    "customer_price_max_by_week" : Feature(column="price", time_col="7d", by=("customer_id",), agg="max"),
-    "customer_price_max_by_month" : Feature(column="price", time_col="35d", by=("customer_id",), agg="max"),
-    "sales_id_mean_by_week" : Feature(column="sales_channel_id", time_col="7d", by=("article_id",), agg="mean"),
-    "sales_id_mean_by_month" : Feature(column="sales_channel_id", time_col="35d", by=("article_id",), agg="mean"),
-    "sales_id_min_by_week" : Feature(column="sales_channel_id", time_col="7d", by=("article_id",), agg="min"),
-    "sales_id_min_by_month" : Feature(column="sales_channel_id", time_col="35d", by=("article_id",), agg="min"),
-    "sales_id_max_by_week" : Feature(column="sales_channel_id", time_col="7d", by=("article_id",), agg="max"),
-    "sales_id_max_by_month" : Feature(column="sales_channel_id", time_col="35d", by=("article_id",), agg="max"),
+    "article_sales_by_week" : Feature(column=None, by=("article_id", "7d"), agg="count"),
+    "article_sales_by_month" : Feature(column=None, by=("article_id", "35d"), agg="count"),
+    "product_sales_by_week" : Feature(column=None, by=("prod_name", "7d"), agg="count"),
+    "product_sales_by_month" : Feature(column=None, by=("prod_name", "35d"), agg="count"),
+    "group_sales_by_week" : Feature(column=None, by=("product_group_name", "7d"), agg="count"),
+    "group_sales_by_month" : Feature(column=None, by=("product_group_name", "35d"), agg="count"),
+    "article_purchases_by_week" : Feature(column=None, by=("article_id", "customer_id", "7d"), agg="count"),
+    "article_purchases_by_month" : Feature(column=None, by=("article_id", "customer_id", "35d"), agg="count"),
+    "product_purchases_by_week" : Feature(column=None, by=("prod_name", "customer_id", "7d"), agg="count"),
+    "product_purchases_by_month" : Feature(column=None, by=("prod_name", "customer_id", "35d"), agg="count"),
+    "group_purchases_by_week" : Feature(column=None, by=("product_group_name", "customer_id", "7d"), agg="count"),
+    "group_purchases_by_month" : Feature(column=None, by=("product_group_name", "customer_id", "35d"), agg="count"),
+    "age_mean_by_week" : Feature(column="age", by=("article_id", "7d"), agg="mean"),
+    "age_mean_by_month" : Feature(column="age", by=("article_id", "35d"), agg="mean"),
+    "age_min_by_week" : Feature(column="age", by=("article_id", "7d"), agg="min"),
+    "age_min_by_month" : Feature(column="age", by=("article_id", "35d"), agg="min"),
+    "age_max_by_week" : Feature(column="age", by=("article_id", "7d"), agg="max"),
+    "age_max_by_month" : Feature(column="age", by=("article_id", "35d"), agg="max"),
+    "price_mean_by_week" : Feature(column="price", by=("article_id", "7d"), agg="mean"),
+    "price_mean_by_month" : Feature(column="price", by=("article_id", "35d"), agg="mean"),
+    "price_min_by_week" : Feature(column="price", by=("article_id", "7d"), agg="min"),
+    "price_min_by_month" : Feature(column="price", by=("article_id", "35d"), agg="min"),
+    "price_max_by_week" : Feature(column="price", by=("article_id", "7d"), agg="max"),
+    "customer_price_mean_by_week" : Feature(column="price", by=("customer_id", "7d"), agg="mean"),
+    "customer_price_mean_by_month" : Feature(column="price", by=("customer_id", "35d"), agg="mean"),
+    "customer_price_min_by_week" : Feature(column="price", by=("customer_id", "7d"), agg="min"),
+    "customer_price_min_by_month" : Feature(column="price", by=("customer_id", "35d"), agg="min"),
+    "customer_price_max_by_week" : Feature(column="price", by=("customer_id", "7d"), agg="max"),
+    "customer_price_max_by_month" : Feature(column="price", by=("customer_id", "35d"), agg="max"),
+    "sales_id_mean_by_week" : Feature(column="sales_channel_id", by=("article_id", "7d"), agg="mean"),
+    "sales_id_mean_by_month" : Feature(column="sales_channel_id", by=("article_id", "35d"), agg="mean"),
+    "sales_id_min_by_week" : Feature(column="sales_channel_id", by=("article_id", "7d"), agg="min"),
+    "sales_id_min_by_month" : Feature(column="sales_channel_id", by=("article_id", "35d"), agg="min"),
+    "sales_id_max_by_week" : Feature(column="sales_channel_id",  by=("article_id", "7d"), agg="max"),
+    "sales_id_max_by_month" : Feature(column="sales_channel_id", by=("article_id", "35d"), agg="max"),
 }
 
 derivative_functions = {
@@ -177,6 +183,30 @@ derivative_features = {
 
 #%%
 if __name__ == "__main__":
+    print("Loading data...")
+    transactions = pd.read_csv("data/transactions_sample.csv", parse_dates=['t_dat'])
+    articles = pd.read_csv("data/articles.csv")
+    customers = pd.read_csv("data/customers.csv")
+
+    print("Calculating windows...")
+    # chose 35 days as the larger (monthly) window because it is a multiple of 7.
+    # This prevents overlap and leakage.
+    windows = [7, 35]
+
+    for window in windows:
+        last = (transactions.t_dat.max() - transactions.t_dat.min()).days // window
+        transactions[f'{window}d'] = last - (transactions.t_dat.max() - transactions.t_dat).dt.days // window
+
+    print("Merging articles.csv and customers.csv features...")
+    transactions = transactions\
+        .merge(articles[['article_id', 'prod_name', 'product_group_name']], on="article_id", how="left")\
+        .merge(customers[['customer_id', 'age']], on="customer_id", how="left")
+
+    print("Initializing feature generator...")
     feature_generator = FeatureGenerator(features, derivative_features, derivative_functions)
-    feature_generator.fit(transactions, articles, customers)
-    print(feature_generator.feature_dictionary)
+    print("Fitting feature generator...")
+    feature_generator.fit(transactions, articles, customers, verbose=True)
+    print("Transforming recommendations...")
+    recommendations = feature_generator.transform(transactions, verbose=True)
+    print(recommendations.head())
+    print(recommendations.columns)
