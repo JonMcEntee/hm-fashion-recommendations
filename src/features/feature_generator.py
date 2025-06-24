@@ -119,17 +119,6 @@ features = {
     "age_min_by_month" : Feature(column="age", by=("article_id", "35d"), agg="min"),
     "age_max_by_week" : Feature(column="age", by=("article_id", "7d"), agg="max"),
     "age_max_by_month" : Feature(column="age", by=("article_id", "35d"), agg="max"),
-    "price_mean_by_week" : Feature(column="price", by=("article_id", "7d"), agg="mean"),
-    "price_mean_by_month" : Feature(column="price", by=("article_id", "35d"), agg="mean"),
-    "price_min_by_week" : Feature(column="price", by=("article_id", "7d"), agg="min"),
-    "price_min_by_month" : Feature(column="price", by=("article_id", "35d"), agg="min"),
-    "price_max_by_week" : Feature(column="price", by=("article_id", "7d"), agg="max"),
-    "customer_price_mean_by_week" : Feature(column="price", by=("customer_id", "7d"), agg="mean"),
-    "customer_price_mean_by_month" : Feature(column="price", by=("customer_id", "35d"), agg="mean"),
-    "customer_price_min_by_week" : Feature(column="price", by=("customer_id", "7d"), agg="min"),
-    "customer_price_min_by_month" : Feature(column="price", by=("customer_id", "35d"), agg="min"),
-    "customer_price_max_by_week" : Feature(column="price", by=("customer_id", "7d"), agg="max"),
-    "customer_price_max_by_month" : Feature(column="price", by=("customer_id", "35d"), agg="max"),
     "sales_id_mean_by_week" : Feature(column="sales_channel_id", by=("article_id", "7d"), agg="mean"),
     "sales_id_mean_by_month" : Feature(column="sales_channel_id", by=("article_id", "35d"), agg="mean"),
     "sales_id_min_by_week" : Feature(column="sales_channel_id", by=("article_id", "7d"), agg="min"),
@@ -138,9 +127,15 @@ features = {
     "sales_id_max_by_month" : Feature(column="sales_channel_id", by=("article_id", "35d"), agg="max"),
 }
 
+def divide(x, y):
+    return x / y
+
+def subtract(x, y):
+    return x - y
+
 derivative_functions = {
-    "divide": lambda x, y: x / y,
-    "subtract": lambda x, y: x - y
+    "divide": divide,
+    "subtract": subtract
 }
 
 derivative_features = {
@@ -168,23 +163,13 @@ derivative_features = {
         feature_1="age",
         feature_2="age_mean_by_month",
         function="subtract"
-    ),
-    "distance_from_mean_price_week": DerivativeFeature(
-        feature_1="price",
-        feature_2="price_mean_by_week",
-        function="subtract" 
-    ),
-    "distance_from_mean_price_month": DerivativeFeature(
-        feature_1="price",
-        feature_2="price_mean_by_month",
-        function="subtract"
     )
 }
 
 #%%
 if __name__ == "__main__":
     print("Loading data...")
-    transactions = pd.read_csv("data/transactions_sample.csv", parse_dates=['t_dat'])
+    transactions = pd.read_csv("data/transactions_train.csv", parse_dates=['t_dat'])
     articles = pd.read_csv("data/articles.csv")
     customers = pd.read_csv("data/customers.csv")
 
@@ -197,6 +182,8 @@ if __name__ == "__main__":
         last = (transactions.t_dat.max() - transactions.t_dat.min()).days // window
         transactions[f'{window}d'] = last - (transactions.t_dat.max() - transactions.t_dat).dt.days // window
 
+    window_table = transactions[[f"{window}d" for window in windows]].drop_duplicates()
+
     print("Merging articles.csv and customers.csv features...")
     transactions = transactions\
         .merge(articles[['article_id', 'prod_name', 'product_group_name']], on="article_id", how="left")\
@@ -206,7 +193,43 @@ if __name__ == "__main__":
     feature_generator = FeatureGenerator(features, derivative_features, derivative_functions)
     print("Fitting feature generator...")
     feature_generator.fit(transactions, articles, customers, verbose=True)
+
+    # import pickle
+    # with open('saved_models/feature_generator.pkl', 'wb') as f:
+    #     pickle.dump(feature_generator, f)
+
+    recommendations = pd.read_csv("data/recommendations.csv")\
+        .rename(columns={'week': '7d', 'recommendation': 'article_id'})
+    
+    positive_samples = transactions[['article_id', 'customer_id', '7d']]\
+        .drop_duplicates()
+    
+
+    negative_samples = pd.merge(
+        recommendations,
+        positive_samples,
+        on=['customer_id', '7d', 'article_id'],
+        how='left',
+        indicator=True
+    )
+
+    # Filter to only keep samples not in positive
+    negative_samples = negative_samples[negative_samples['_merge'] == 'left_only']
+
+    # Drop the merge indicator column
+    negative_samples = negative_samples.drop('_merge', axis=1)
+
+    positive_samples["label"] = 1
+    negative_samples['label'] = 0
+
+    samples = pd.concat([positive_samples, negative_samples.sample(len(positive_samples))])
+    
+    samples = samples.merge(window_table, on='7d', how='left')
+    samples = samples.merge(articles[['article_id', 'prod_name', 'product_group_name']], on='article_id', how='left')
+    samples = samples.merge(customers[['customer_id', 'age']], on='customer_id', how='left')
+
     print("Transforming recommendations...")
-    recommendations = feature_generator.transform(transactions, verbose=True)
-    print(recommendations.head())
-    print(recommendations.columns)
+    featured_recommendations = feature_generator.transform(samples, verbose=True)
+    print(featured_recommendations.head())
+
+    # featured_recommendations.to_csv("data/ranker_train.csv", index=False)
