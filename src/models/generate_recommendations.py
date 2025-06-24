@@ -307,7 +307,7 @@ if __name__ == "__main__":
     print("Generating recommendations...")
     for week in tqdm(range(1, 105)):
         customers = transactions[transactions['week'] == week]['customer_id'].unique().tolist()
-        recommendations = recommender(customers, week=week, k=12)
+        recommendations = recommender(customers, week=week, k=12).sample(1000)
         recommendations["week"] = week
         if week == 1:
             recommendations.to_csv("data/recommendations.csv", index=False)
