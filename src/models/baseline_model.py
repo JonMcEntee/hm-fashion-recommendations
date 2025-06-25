@@ -33,7 +33,7 @@ def create_baseline_recommender(train: pd.DataFrame) -> Callable:
         return pd.DataFrame({
             "customer_id": [customer for customer in customers for _ in range(k)],
             "rank": list(range(1, k+1)) * len(customers),
-            "recommendation": top[:k] * len(customers)
+            "article_id": top[:k] * len(customers)
         })
     
     return baseline
@@ -73,7 +73,7 @@ def create_temporal_baseline(train: pd.DataFrame) -> Callable:
         return pd.DataFrame({
             "customer_id": [customer for customer in customers for _ in range(k)],
             "rank": list(range(1, k+1)) * len(customers),
-            "recommendation": top_temporal[:k] * len(customers)
+            "article_id": top_temporal[:k] * len(customers)
         })
     
     return temporal_baseline
@@ -112,7 +112,7 @@ def create_random_baseline(train: pd.DataFrame) -> Callable:
         return pd.DataFrame({
             "customer_id": [customer for customer in customers for _ in range(k)],
             "rank": list(range(1, k+1)) * len(customers),
-            "recommendation": recommendations
+            "article_id": recommendations
         })
     
     return random_baseline 

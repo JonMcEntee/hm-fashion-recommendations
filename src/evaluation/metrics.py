@@ -54,7 +54,7 @@ def mapk(recommender: Callable, test: pd.DataFrame, k: int = 12) -> float:
     predictions = recommender(customers)
     
     pred_matrix = (
-        predictions.pivot(index='customer_id', columns='rank', values='recommendation')
+        predictions.pivot(index='customer_id', columns='rank', values='article_id')
         .reindex(customers)
         .values
     )

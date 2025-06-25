@@ -17,14 +17,20 @@ class FeatureGenerator:
         self, 
         features: dict[str, Feature],
         derivative_features: dict[str, DerivativeFeature],
-        derivative_functions: dict[str, Callable]
+        derivative_functions: dict[str, Callable],
     ):
         self.features = features
         self.derivative_features = derivative_features
         self.derivative_functions = derivative_functions
         self.feature_dictionary = {}
 
-    def fit(self, transactions: pd.DataFrame, articles: pd.DataFrame, customers: pd.DataFrame, verbose: bool = False):
+    def fit(
+        self,
+        transactions: pd.DataFrame,
+        articles: pd.DataFrame,
+        customers: pd.DataFrame,
+        verbose: bool = False
+    ):
         
         temp = {}
         same_merge_columns = defaultdict(list)

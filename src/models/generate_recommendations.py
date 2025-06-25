@@ -30,7 +30,7 @@ def create_weekly_bestsellers_recommender(
             and returns a DataFrame with columns:
                 - customer_id
                 - rank
-                - recommendation (article_id)
+                - article_id
             The recommendations are the top-k bestsellers from the previous week for each customer.
     
     Usage:
@@ -61,9 +61,9 @@ def create_weekly_bestsellers_recommender(
 
         Returns:
             pd.DataFrame: DataFrame with columns:
-                - customer_id: Customer ID
-                - rank: Rank of the recommendation (1 to k)
-                - recommendation: Article ID of the recommended item
+                - customer_id
+                - rank
+                - article_id
             Each customer receives the same top-k bestsellers from the previous week.
 
         Usage:
@@ -75,7 +75,7 @@ def create_weekly_bestsellers_recommender(
         return pd.DataFrame({
             "customer_id": [customer for customer in customers for _ in range(num_recommendations)],
             "rank": list(range(1, num_recommendations+1)) * len(customers),
-            "recommendation": recommendations * len(customers)
+            "article_id": recommendations * len(customers)
         })
     
     return weekly_bestsellers
@@ -146,8 +146,7 @@ def create_previous_purchases(
         # Get unique customer-article pairs and create a clean copy
         filtered_history = filtered_history[['customer_id', 'article_id']]\
             .drop_duplicates()\
-            .copy()\
-            .rename(columns={'article_id': 'recommendation'})
+            .copy()
         
         return filtered_history
     
@@ -182,8 +181,7 @@ def create_same_product_code(
 
     # Build an index mapping each article to its product code
     index = articles[['article_id', 'product_code']]\
-        .copy()\
-        .rename(columns={'article_id': 'recommendation'})
+        .copy()
 
     def same_product_code(previous_purchases: pd.DataFrame) -> pd.DataFrame:
         """
@@ -206,8 +204,8 @@ def create_same_product_code(
         previous_purchases = previous_purchases.copy()
         previous_purchases = (
             previous_purchases
-            .merge(index, on='recommendation', how='inner') # Add product_code to previous purchases
-            .drop(columns=['recommendation'], axis=1)       # Remove article_id, keep product_code
+            .merge(index, on='article_id', how='inner') # Add product_code to previous purchases
+            .drop(columns=['article_id'], axis=1)       # Remove article_id, keep product_code
             .drop_duplicates()                          # Remove duplicate product codes
         )
         # Find all articles that share any of these product codes
@@ -241,7 +239,7 @@ def create_recommendation_generator(
             A function (recommendation_generator) that takes a list of customer IDs, a week number, and k,
             and returns a DataFrame with columns:
                 - customer_id: Customer ID
-                - recommendation: Article ID of the recommended item
+                - article_id: Article ID of the recommended item
             The recommendations are aggregated from all underlying recommenders and deduplicated.
 
     Usage:
@@ -265,7 +263,7 @@ def create_recommendation_generator(
         Returns:
             pd.DataFrame: DataFrame with columns:
                 - customer_id: Customer ID
-                - recommendation: Article ID of the recommended item
+                - article_id: Article ID of the recommended item
             The DataFrame contains deduplicated recommendations aggregated from all recommenders.
 
         Usage:

@@ -125,7 +125,7 @@ def create_als_recommender(
         return pd.DataFrame({
             "customer_id": customer_ids,
             "rank": ranks,
-            "recommendation": recommendations
+            "article_id": recommendations
         })
 
     return als_recommender
