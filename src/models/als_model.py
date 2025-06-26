@@ -107,7 +107,7 @@ def create_als_recommender(
         for customer in customers:
             if customer not in user_map:
                 # Use baseline for cold start
-                recs = baseline([customer], k=k)['recommendation'].tolist()
+                recs = baseline([customer], k=k)['article_id'].tolist()
             else:
                 user_idx = user_map[customer]
                 recommended = als_model.recommend(

@@ -229,6 +229,9 @@ if __name__ == "__main__":
     negative_samples['label'] = 0
 
     samples = pd.concat([positive_samples, negative_samples.sample(len(positive_samples))])
+
+    # We want to predict the next week's purchases, so we need to shift the week by 1
+    samples['7d'] -= 1
     
     samples = samples.merge(window_table, on='7d', how='left')
     samples = samples.merge(articles[['article_id', 'prod_name', 'product_group_name']], on='article_id', how='left')
@@ -236,6 +239,10 @@ if __name__ == "__main__":
 
     print("Transforming recommendations...")
     featured_recommendations = feature_generator.transform(samples, verbose=True)
-    print(featured_recommendations.head())
 
-    # featured_recommendations.to_csv("data/ranker_train.csv", index=False)
+    featured_recommendations['7d'] += 1
+
+    featured_recommendations = featured_recommendations.drop(columns=['35d'], axis=1)
+    featured_recommendations = featured_recommendations.merge(window_table, on='7d', how='left')
+
+    featured_recommendations.to_csv("data/ranker_train.csv", index=False)
