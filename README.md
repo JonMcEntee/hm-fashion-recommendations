@@ -1,111 +1,138 @@
-# H\&M Fashion Recommendations
+# H&M Fashion Recommendations
 
 <img src="images/H%26M-Logo.svg" width="40%" height="40%">
 
 ## Overview
 
-This repository contains [a Jupyter Notebook](https://github.com/JonMcEntee/hm-fashion-recommendations/blob/main/HM_Fashion_Recommendations.ipynb) for building a product recommendation system. It was developed as part of the [H\&M Personalized Fashion Recommendations Kaggle competition](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations).
+This repository provides a modular, production-ready codebase for building and evaluating personalized product recommendation systems, developed for the [H&M Personalized Fashion Recommendations Kaggle competition](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations).
 
-The notebook presents an approach to predict a customer's next likely fashion purchases using:
+The project supports:
+- **Collaborative Filtering** with Implicit ALS
+- **Learning-to-Rank** with LightGBM (LambdaRank)
+- **Automated Feature Engineering**
+- **Comprehensive Evaluation & Hyperparameter Tuning**
 
-* **Collaborative filtering** with the Implicit Alternating Least Squares (ALS) algorithm
-* **Ranking by Gradient Boosted Trees** using the LightGBM Framework
+A [Jupyter Notebook](https://github.com/JonMcEntee/hm-fashion-recommendations/blob/main/HM_Fashion_Recommendations.ipynb) (`HM_Fashion_Recommendations.ipynb`) demonstrates the full workflow, from EDA to model training and evaluation.
 
-Key datasets used:
+## Project Structure
 
-* `transactions_train.csv` – historical purchase data
-* `articles.csv` – metadata for fashion items
-* `customers.csv` – anonymized customer details
+```
+hm-fashion-recommendations/
+├── src/
+│   ├── models/                # ALS, LightGBM, baselines, candidate generation
+│   ├── features/              # Feature engineering and transformation
+│   ├── evaluation/            # MAP@12 and APK metrics
+│   ├── optimization/          # Grid search for ALS and LightGBM
+│   └── ...
+├── data/                     # (Not included) Large CSVs from Kaggle
+├── saved_models/              # Pickled models and feature generators
+├── results/                   # Model evaluation results
+├── tests/                     # Unit tests for features and recommenders
+├── images/                    # Project images and logo
+├── HM_Fashion_Recommendations.ipynb  # Main notebook
+├── requirements.txt           # Python dependencies
+└── README.md
+```
 
-## Key Features
+## Installation
 
-1. **Exploratory Data Analysis (EDA)**
+1. **Clone the repository**
 
-   * Customer and article statistics
-   * Weekly transaction aggregation
-   * Time-based user behavior exploration
+```bash
+git clone https://github.com/JonMcEntee/hm-fashion-recommendations.git
+cd hm-fashion-recommendations
+```
 
-2. **ALS Modeling Approach**
+2. **Set up your environment**
 
-   * Implicit ALS training on a user-item interaction matrix
-   * Use of transaction frequency as implicit feedback
-   * Tuning latent factors and regularization parameters
+```bash
+conda create -n hm-fashion python=3.9
+conda activate hm-fashion
+pip install -r requirements.txt
+```
 
-3. **LightGBM Ranker Approach**
+3. **Set the Python path**
 
-   * Generates recommendation based on simple heuristics
-   * Produces trainable features on the data
-   * Ranks using a Gradient Boosted Tree algorithm
+```bash
+export PYTHONPATH=$(pwd)
+```
 
+## Data
+
+- Download the competition data from Kaggle and place the CSVs in the `data/` directory.
+- Key files: `transactions_train.csv`, `articles.csv`, `customers.csv`
+- Large files (not included in repo): see [Kaggle competition page](https://www.kaggle.com/competitions/h-and-m-personalized-fashion-recommendations/data)
 
 ## Usage
 
-To run the code in this repository, you'll need to set up your Python environment correctly. Here's how:
+### 1. **Jupyter Notebook**
 
-1. **Create and activate the conda environment**
+The main workflow is demonstrated in:
 
-   First, create a new conda environment and activate it:
+```bash
+jupyter notebook HM_Fashion_Recommendations.ipynb
+```
 
-   ```bash
-   # Create the environment
-   conda create -n hm-fashion python=3.9
-   
-   # Activate the environment
-   conda activate hm-fashion
-   ```
+### 2. **Run Models from Command Line**
 
-2. **Install dependencies**
+- **ALS Model:**
+  ```bash
+  python src/models/als_model.py
+  ```
+- **LightGBM Ranker:**
+  ```bash
+  python src/models/ranker_model.py
+  ```
+- **Grid Search (ALS):**
+  ```bash
+  python src/optimization/als_grid_search.py
+  ```
+- **Grid Search (Ranker):**
+  ```bash
+  python src/optimization/ranker_grid_search.py
+  ```
 
-   Install all required packages from the requirements.txt file:
+## Models & Features
 
-   ```bash
-   # Install dependencies
-   pip install -r requirements.txt
-   ```
+- **ALS Collaborative Filtering:**
+  - Trains on user-item interaction matrix with time-decayed implicit feedback
+  - Handles cold start with temporal popularity baseline
+- **LightGBM LambdaRank:**
+  - Ranks candidate recommendations using engineered features
+  - Features include: purchase counts, product group stats, customer demographics, and derivatives
+- **Baselines:**
+  - Global popularity, temporal popularity, random recommender
+- **Candidate Generation:**
+  - Combines previous purchases, similar product codes, and weekly bestsellers
+- **Feature Engineering:**
+  - Automated via `FeatureGenerator` (see `src/features/feature_generator.py`)
 
-3. **Set up the Python path**
+## Evaluation
 
-   Since the code is organized in modules, you need to set the PYTHONPATH to include the project root directory. This ensures Python can find all the modules correctly.
+- **Metrics:**
+  - Mean Average Precision at 12 (MAP@12)
+  - Average Precision at k (APK)
+- **Evaluation scripts:**
+  - See `src/evaluation/metrics.py`
 
-   ```bash
-   # From the project root directory
-   export PYTHONPATH=$(pwd)
-   ```
+## Hyperparameter Tuning
 
-4. **Run the code**
+- **ALS:**
+  - Grid search over factors, regularization, iterations, alpha
+  - See `src/optimization/als_grid_search.py`
+- **LightGBM Ranker:**
+  - Grid search over n_estimators, boosting type, min_child_samples, learning_rate
+  - See `src/optimization/ranker_grid_search.py`
 
-   After setting the PYTHONPATH, you can run any of the Python modules:
+## Testing
 
-   ```bash
-   # Example: Run the ALS model
-   python src/models/als_model.py
-   ```
-
-5. **Launch the Jupyter notebook**
-
-   To explore the main analysis and run the recommendation system:
-
-   ```bash
-   # Launch Jupyter notebook
-   jupyter notebook
-   ```
-
-   Then navigate to and open `HM_Fashion_Recommendations.ipynb` in your browser.
-
-   Alternatively, you can launch the notebook directly:
-
-   ```bash
-   # Launch the specific notebook
-   jupyter notebook HM_Fashion_Recommendations.ipynb
-   ```
-
-
-## Key Findings
-
-* Recent transaction activity is more predictive than older data
-* Implicit ALS performs well for large-scale retail data with implicit feedback
+- Unit tests for feature engineering and candidate generation in `tests/`
+- Run with:
+  ```bash
+  pytest tests/
+  ```
 
 ## Acknowledgments
 
-* Kaggle for organizing the competition
-* H\&M Group for providing real-world retail data
+- Kaggle for organizing the competition
+- H&M Group for providing real-world retail data
