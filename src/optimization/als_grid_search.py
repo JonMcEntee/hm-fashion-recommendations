@@ -1,5 +1,7 @@
 """
-Grid search module for tuning ALS model hyperparameters.
+ALS grid search module for H&M Fashion Recommendations.
+
+This module provides a function to perform grid search for hyperparameter tuning of the ALS collaborative filtering model, evaluating each configuration using MAP@12.
 """
 
 import pandas as pd

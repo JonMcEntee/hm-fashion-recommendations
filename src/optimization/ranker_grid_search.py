@@ -1,5 +1,7 @@
 """
-Grid search module for tuning LGBM ranker model hyperparameters.
+Ranker grid search module for H&M Fashion Recommendations.
+
+This module provides a function to perform grid search for hyperparameter tuning of the LightGBM ranker model, evaluating each configuration using MAP@12.
 """
 
 import pandas as pd
@@ -19,6 +21,22 @@ def run_ranker_grid_search(
     param_grid=None,
     last_week=None
 ):
+    """
+    Run grid search to find optimal LGBM ranker hyperparameters.
+
+    Args:
+        train (pd.DataFrame): Training data for the ranker.
+        test (pd.DataFrame): Test data for evaluation.
+        transactions (pd.DataFrame): Transaction data for candidate generation.
+        articles (pd.DataFrame): Article metadata.
+        customers (pd.DataFrame): Customer metadata.
+        feature_generator: Feature generator for candidate features.
+        param_grid (dict, optional): Dictionary of hyperparameters to search over.
+        last_week (int, optional): The last week number for context.
+
+    Returns:
+        list: List of dictionaries containing parameter combinations and their MAP@12 scores.
+    """
     if param_grid is None:
         param_grid = {
             'n_estimators': [10, 100, 200, 500],

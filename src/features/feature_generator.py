@@ -1,3 +1,10 @@
+"""
+Feature generation module for H&M Fashion Recommendations.
+
+This module defines the FeatureGenerator class and related utilities for creating, fitting,
+and transforming features for recommendation models. It supports both basic and derivative features,
+and provides aggregation utilities for feature engineering.
+"""
 #%%
 import sys
 import os
@@ -13,12 +20,25 @@ Feature = namedtuple("Feature", ["agg", "column", "by"])
 DerivativeFeature = namedtuple("DerivativeFeature", ["feature_1", "feature_2", "function"])
 
 class FeatureGenerator:
+    """
+    FeatureGenerator for aggregating and transforming features for recommendation models.
+
+    This class supports fitting on transaction, article, and customer data, and transforming candidate recommendations with both basic and derivative features.
+    """
     def __init__(
         self, 
         features: dict[str, Feature],
         derivative_features: dict[str, DerivativeFeature],
         derivative_functions: dict[str, Callable],
     ):
+        """
+        Initialize the FeatureGenerator.
+
+        Args:
+            features (dict): Dictionary of feature definitions.
+            derivative_features (dict): Dictionary of derivative feature definitions.
+            derivative_functions (dict): Dictionary mapping function names to callables for derivative features.
+        """
         self.features = features
         self.derivative_features = derivative_features
         self.derivative_functions = derivative_functions
@@ -31,7 +51,15 @@ class FeatureGenerator:
         customers: pd.DataFrame,
         verbose: bool = False
     ):
-        
+        """
+        Fit the feature generator by computing aggregations on the provided data.
+
+        Args:
+            transactions (pd.DataFrame): Transaction data.
+            articles (pd.DataFrame): Article metadata.
+            customers (pd.DataFrame): Customer metadata.
+            verbose (bool, optional): If True, print progress messages.
+        """
         temp = {}
         same_merge_columns = defaultdict(list)
         for feature_name, feature in self.features.items():
@@ -45,7 +73,7 @@ class FeatureGenerator:
                 feature.agg
             )
             same_merge_columns[feature.by].append(feature_name)
-        
+        # Merge all features by their group-by columns
         for by, columns in same_merge_columns.items():
             df = None
             for column in columns:
@@ -55,15 +83,23 @@ class FeatureGenerator:
                     df = temp[column]
                 else:
                     df = df.merge(temp[column], on=by, how="left")
-                
             self.feature_dictionary[by] = df
     
     def transform(self, recommendations: pd.DataFrame, verbose: bool = False):
+        """
+        Transform candidate recommendations by merging in all fitted features and computing derivative features.
+
+        Args:
+            recommendations (pd.DataFrame): DataFrame of candidate recommendations.
+            verbose (bool, optional): If True, print progress messages.
+
+        Returns:
+            pd.DataFrame: Recommendations with added feature columns.
+        """
         for by, df in self.feature_dictionary.items():
             if verbose:
                 print(f" Merging group {by}...")
             recommendations = recommendations.merge(df, on=by, how="left")
-
         for feature_name, feature in self.derivative_features.items():
             if verbose:
                 print(f" Calculating Derivative Feature {feature_name}...")
@@ -71,10 +107,8 @@ class FeatureGenerator:
                 recommendations[feature.feature_1],
                 recommendations[feature.feature_2]
             )
-        
         return recommendations
 
-    # Transactions counts
     def get_transactions_aggs(
         self,
         transactions: pd.DataFrame,
@@ -83,24 +117,31 @@ class FeatureGenerator:
         by: list[str] = [],
         agg: str = 'count'
         ) -> pd.DataFrame:
+        """
+        Compute aggregations on transaction data for feature engineering.
 
+        Args:
+            transactions (pd.DataFrame): Transaction data.
+            feature_name (str): Name of the feature to create.
+            column (str): Column to aggregate (or None for count).
+            by (list[str]): Columns to group by.
+            agg (str): Aggregation function ('count', 'sum', 'mean', 'std', 'min', 'max').
+
+        Returns:
+            pd.DataFrame: Aggregated feature DataFrame.
+        """
         transactions = transactions.copy()
-
         if agg not in ['count', 'sum', 'mean', 'std', 'min', 'max']:
             raise Exception(f"Invalid aggregation: {agg}")
-        
         if column is None and agg != 'count':
             raise Exception("Column must be provided for non-count aggregations")
-
         if column is None:
             column = "transactions"
             transactions[column] = 1
-
         column_customer_agg = transactions\
             .groupby(list(by))[column]\
             .agg(agg)\
             .reset_index(name=feature_name)
-        
         return column_customer_agg
 
 #%%
@@ -134,9 +175,15 @@ features = {
 }
 
 def divide(x, y):
+    """
+    Division of two features.
+    """
     return x / y
 
 def subtract(x, y):
+    """
+    Difference of two features.
+    """
     return x - y
 
 derivative_functions = {

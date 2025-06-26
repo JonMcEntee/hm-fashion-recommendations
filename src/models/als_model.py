@@ -1,3 +1,9 @@
+"""
+ALS model module for H&M Fashion Recommendations.
+
+This module provides functions to train and use an Alternating Least Squares (ALS) model for collaborative filtering-based recommendations.
+It includes utilities for model training, recommendation generation, and evaluation.
+"""
 import numpy as np
 import scipy.sparse as sp
 import pandas as pd
@@ -13,7 +19,18 @@ def train_als_model(
     random_seed: int
 ):
     """
-    Prepares data and trains an ALS model, returning the model and mappings.
+    Prepare data and train an ALS model, returning the model and mappings.
+
+    Args:
+        train (pd.DataFrame): Training data with customer and article IDs.
+        factors (int): Number of latent factors.
+        iterations (int): Number of ALS training iterations.
+        regularization (float): Regularization parameter.
+        alpha (float): Confidence scaling factor for implicit feedback.
+        random_seed (int): Random seed for reproducibility.
+
+    Returns:
+        Tuple: (als_model, user_map, item_map, reverse_item_map, item_user_matrix)
     """
     # Create user and item mappings
     user_ids = train['customer_id'].unique()
@@ -64,21 +81,22 @@ def create_als_recommender(
     item_user_matrix: sp.csr_matrix = None
 ) -> Callable:
     """
-    Create an ALS-based recommender.
-    
-    Args:
-        train: Training data DataFrame
-        factors: Number of latent factors
-        iterations: Number of training iterations
-        regularization: Regularization parameter
-        alpha: Confidence scaling factor
-        random_seed: Random seed for reproducibility
-        baseline: Fallback recommender for cold start
-        
-    Returns:
-        Function that generates recommendations using ALS model
-    """
+    Create an ALS-based recommender function.
 
+    Args:
+        train (pd.DataFrame, optional): Training data for fitting ALS if model not provided.
+        factors (int): Number of latent factors.
+        iterations (int): Number of ALS training iterations.
+        regularization (float): Regularization parameter.
+        alpha (float): Confidence scaling factor.
+        random_seed (int): Random seed for reproducibility.
+        baseline (Callable, optional): Fallback recommender for cold start.
+        als_model (AlternatingLeastSquares, optional): Pretrained ALS model.
+        user_map, item_map, reverse_item_map, item_user_matrix: Precomputed mappings and matrix.
+
+    Returns:
+        Callable: Function that generates recommendations using ALS model.
+    """
     if als_model is None:
         als_model, user_map, item_map, reverse_item_map, item_user_matrix = train_als_model(
             train,
@@ -92,13 +110,13 @@ def create_als_recommender(
     def als_recommender(customers: List[str], k: int = 12) -> pd.DataFrame:
         """
         Generate recommendations for a list of customers using ALS model.
-        
+
         Args:
-            customers: List of customer IDs
-            k: Number of recommendations per customer
-            
+            customers (List[str]): List of customer IDs.
+            k (int): Number of recommendations per customer.
+
         Returns:
-            DataFrame with recommendations
+            pd.DataFrame: DataFrame with columns [customer_id, rank, article_id].
         """
         recommendations = []
         customer_ids = []

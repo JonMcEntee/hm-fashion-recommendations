@@ -1,3 +1,8 @@
+"""
+Baseline recommenders module for H&M Fashion Recommendations.
+
+This module provides simple baseline recommenders for benchmarking, including global popularity, temporal popularity, and random recommenders.
+"""
 import pandas as pd
 from typing import Callable, List
 import numpy as np
@@ -21,7 +26,7 @@ def create_baseline_recommender(train: pd.DataFrame) -> Callable:
     
     def baseline(customers: List[str], k: int = 12) -> pd.DataFrame:
         """
-        Generate recommendations for a list of customers.
+        Generate recommendations for a list of customers using global popularity.
         
         Args:
             customers: List of customer IDs
@@ -61,7 +66,7 @@ def create_temporal_baseline(train: pd.DataFrame) -> Callable:
     
     def temporal_baseline(customers: List[str], k: int = 12) -> pd.DataFrame:
         """
-        Generate recommendations for a list of customers.
+        Generate recommendations for a list of customers using recent popularity.
         
         Args:
             customers: List of customer IDs

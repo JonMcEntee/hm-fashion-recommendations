@@ -1,18 +1,24 @@
+"""
+Evaluation metrics module for H&M Fashion Recommendations.
+
+This module provides functions to compute ranking metrics such as average precision at k (APK
+ and mean average precision at k (MAPK) for evaluating recommender system performance.
+"""
 import numpy as np
 import pandas as pd
 from typing import List, Set, Callable
 
 def apk(actual: List, predicted: List, k: int = 12) -> float:
     """
-    Calculate average precision at k.
+    Calculate average precision at k (APK).
     
     Args:
-        actual: List of actual items
-        predicted: List of predicted items
-        k: Number of recommendations to consider
+        actual (List): List of actual items.
+        predicted (List): List of predicted items.
+        k (int): Number of recommendations to consider.
         
     Returns:
-        Average precision score
+        float: Average precision score at k.
     """
     if len(predicted) > k:
         predicted = predicted[:k]
@@ -32,15 +38,15 @@ def apk(actual: List, predicted: List, k: int = 12) -> float:
 
 def mapk(recommender: Callable, test: pd.DataFrame, k: int = 12) -> float:
     """
-    Calculate mean average precision at k.
+    Calculate mean average precision at k (MAPK).
     
     Args:
-        recommender: Function that generates recommendations
-        test: Test data DataFrame
-        k: Number of recommendations to consider
+        recommender (Callable): Function that generates recommendations.
+        test (pd.DataFrame): Test data DataFrame.
+        k (int): Number of recommendations to consider.
         
     Returns:
-        Mean average precision score
+        float: Mean average precision score at k.
     """
     customers = test['customer_id'].unique()
     

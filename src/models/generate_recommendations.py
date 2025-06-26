@@ -1,3 +1,10 @@
+"""
+Recommendation generator module for H&M Fashion Recommendations.
+
+This module provides functions to create and combine various candidate recommenders,
+including weekly bestsellers, previous purchases, and same product code recommenders.
+It also defines a hybrid generator that aggregates multiple heuristics and models for candidate generation.
+"""
 #%%
 import sys
 import os
@@ -21,17 +28,11 @@ def create_weekly_bestsellers_recommender(
     When called, the returned recommender function provides the top-k bestsellers from the previous week
     for a given list of customers and a specified week.
     
-    Parameters:
+    Args:
         transactions (pd.DataFrame): The training transactions DataFrame. Must contain 'week' and 'article_id' columns.
     
     Returns:
-        Callable[[List[str], int, int], pd.DataFrame]:
-            A function (weekly_bestsellers) that takes a list of customer IDs, a week number, and k,
-            and returns a DataFrame with columns:
-                - customer_id
-                - rank
-                - article_id
-            The recommendations are the top-k bestsellers from the previous week for each customer.
+        Callable: Function that returns top-k bestsellers from the previous week for a list of customers and a specified week.
     
     Usage:
         recommender = create_weekly_bestsellers_recommender(train_df)
@@ -91,19 +92,14 @@ def create_previous_purchases(
     all unique items a customer has interacted with up until a specified week. This is useful for
     analyzing customer purchase patterns and creating temporal-based recommendation features.
     
-    Parameters:
+    Args:
         transactions (pd.DataFrame): The training transactions DataFrame. Must contain columns:
             - t_dat: datetime column with transaction dates
             - customer_id: unique identifier for customers
             - article_id: unique identifier for articles
     
     Returns:
-        Callable[[List[str], int], pd.DataFrame]:
-            A function (previous_purchases) that takes a list of customer IDs and a week number,
-            and returns a DataFrame with columns:
-                - customer_id: Customer identifier
-                - article_id: Article identifiers the customer has interacted with
-            Each row represents a the unique articles purchased by the customer up to the specified week.
+        Callable: Function that returns all unique items a customer has interacted with up to a specified week.
     
     Usage:
         recommender = create_previous_purchases(transactions_df)
@@ -164,15 +160,13 @@ def create_same_product_code(
     with any of those purchases. This is useful for generating recommendations of similar items
     (e.g., different colors or styles of the same product).
 
-    Parameters:
+    Args:
         articles (pd.DataFrame): DataFrame containing article metadata. Must include columns:
             - article_id: Unique identifier for each article
             - product_code: Product code grouping similar articles
 
     Returns:
-        Callable[[pd.DataFrame], pd.DataFrame]:
-            A function (same_product_code) that takes a DataFrame of previous purchases (with column 'article_id')
-            and returns a DataFrame of articles sharing the same product code.
+        Callable: Function that returns articles sharing a product code with previous purchases.
 
     Usage:
         same_code_finder = create_same_product_code(articles_df)
@@ -230,17 +224,12 @@ def create_recommendation_generator(
     a function that, for a given list of customers, week, and k, generates a set of candidate recommendations
     by aggregating the outputs of all these recommenders and removing duplicates.
 
-    Parameters:
+    Args:
         transactions (pd.DataFrame): Transaction data. Must include columns required by each recommender.
         articles (pd.DataFrame): Article metadata. Must include columns required by each recommender.
 
     Returns:
-        Callable[[List[str], int, int], pd.DataFrame]:
-            A function (recommendation_generator) that takes a list of customer IDs, a week number, and k,
-            and returns a DataFrame with columns:
-                - customer_id: Customer ID
-                - article_id: Article ID of the recommended item
-            The recommendations are aggregated from all underlying recommenders and deduplicated.
+        Callable: Function that generates a set of candidate recommendations by aggregating outputs of all recommenders and removing duplicates.
 
     Usage:
         recommender = create_recommendation_generator(transactions_df, articles_df)
