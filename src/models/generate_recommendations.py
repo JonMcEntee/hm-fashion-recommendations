@@ -283,6 +283,7 @@ if __name__ == "__main__":
 
     last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
     transactions['7d'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
+    
 
     print("Creating recommender...")
     recommender = create_recommendation_generator(transactions, articles)
@@ -290,4 +291,3 @@ if __name__ == "__main__":
     print("Computing coverage...")
     coverage_df = coverage(recommender, transactions, k=12)
     coverage_df.to_csv("results/generate_recommendations_coverage.csv", index=False)
-# %%

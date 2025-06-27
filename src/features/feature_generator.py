@@ -275,7 +275,7 @@ if __name__ == "__main__":
     positive_samples["label"] = 1
     negative_samples['label'] = 0
 
-    samples = pd.concat([positive_samples, negative_samples.sample(len(positive_samples))])
+    samples = pd.concat([positive_samples, negative_samples.sample(1_000_000)])
 
     # We want to predict the next week's purchases, so we need to shift the week by 1
     samples['7d'] -= 1
