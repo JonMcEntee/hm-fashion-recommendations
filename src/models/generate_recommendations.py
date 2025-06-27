@@ -81,7 +81,6 @@ def create_weekly_bestsellers_recommender(
     
     return weekly_bestsellers
 
-#%%
 def create_previous_purchases(
     transactions: pd.DataFrame,
 ) -> Callable[[List[str], int], pd.DataFrame]:
@@ -211,7 +210,7 @@ def create_same_product_code(
         return same_code
 
     return same_product_code
-#%%
+
 def create_recommendation_generator(
     transactions: pd.DataFrame,
     articles: pd.DataFrame
@@ -276,29 +275,19 @@ def create_recommendation_generator(
     return recommendation_generator
 #%%
 if __name__ == "__main__":
-    import pickle
-    from tqdm import tqdm
+    from src.evaluation.metrics import coverage
 
-    # Example usage
     print("Loading data...")
-    directory = "data/"
-    transactions = pd.read_csv(directory + "transactions_train.csv", parse_dates=['t_dat'])
-    articles = pd.read_csv(directory + "articles.csv")
+    transactions = pd.read_csv("data/transactions_train.csv", parse_dates=['t_dat'])
+    articles = pd.read_csv("data/articles.csv")
+
+    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
+    transactions['7d'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
 
     print("Creating recommender...")
     recommender = create_recommendation_generator(transactions, articles)
 
-    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
-    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
-
-    print("Generating recommendations...")
-    for week in tqdm(range(1, 105)):
-        customers = transactions[transactions['week'] == week]['customer_id'].unique().tolist()
-        recommendations = recommender(customers, week=week, k=12).sample(400000)
-        recommendations["week"] = week
-        if week == 1:
-            recommendations.to_csv("data/recommendations.csv", index=False)
-        else:
-            recommendations.to_csv("data/recommendations.csv", mode="a", header=False, index=False)
-
-    print("Recommendations saved to recommendations.csv")
+    print("Computing coverage...")
+    coverage_df = coverage(recommender, transactions, k=12)
+    coverage_df.to_csv("results/generate_recommendations_coverage.csv", index=False)
+# %%

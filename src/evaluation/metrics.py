@@ -7,6 +7,7 @@ This module provides functions to compute ranking metrics such as average precis
 import numpy as np
 import pandas as pd
 from typing import List, Set, Callable
+from tqdm import tqdm
 
 def apk(actual: List, predicted: List, k: int = 12) -> float:
     """
@@ -83,4 +84,38 @@ def mapk(recommender: Callable, test: pd.DataFrame, k: int = 12) -> float:
     
     ap_per_customer = precisions.sum(axis=1) / np.minimum(k, actuals_length)
     
-    return float(np.mean(ap_per_customer)) 
+    return float(np.mean(ap_per_customer))
+
+def coverage(recommender: Callable, transactions: pd.DataFrame, k: int = 12) -> pd.DataFrame:
+    """
+    Compute the percentage of customer-article transactions for each week that were recommended by the recommender.
+
+    Args:
+        recommender (Callable): Function that generates recommendations for a list of customers and a week (must accept customers, week, k).
+        transactions (pd.DataFrame): DataFrame with columns ['customer_id', 'article_id', '7d'] representing transactions.
+        k (int, optional): Number of recommendations per customer (default: 12).
+
+    Returns:
+        pd.DataFrame: DataFrame with columns ['7d', 'covered', 'total', 'percent'] showing the coverage per week.
+    """
+    results = []
+    # Ensure correct columns
+    assert {'customer_id', 'article_id', '7d'}.issubset(transactions.columns), "transactions must have 'customer_id', 'article_id', '7d' columns"
+    weeks = sorted(transactions['7d'].unique())
+    for week in tqdm(weeks):
+        week_data = transactions[transactions['7d'] == week]
+        customers = week_data['customer_id'].unique().tolist()
+
+        # Get recommendations for all customers for this week
+        recs = recommender(customers, week, k=k)
+
+        # Ensure columns for merge
+        recs = recs[['customer_id', 'article_id']].drop_duplicates()
+
+        # Merge to find which transactions were recommended
+        merged = week_data.merge(recs, on=['customer_id', 'article_id'], how='left', indicator=True)
+        covered = (merged['_merge'] == 'both').sum()
+        total = len(merged)
+        coverage_pct = covered / total if total > 0 else 0.0
+        results.append({'7d': week, 'covered': covered, 'total': total, 'percent': coverage_pct})
+    return pd.DataFrame(results) 
