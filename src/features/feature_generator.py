@@ -221,6 +221,8 @@ derivative_features = {
 
 #%%
 if __name__ == "__main__":
+    import pickle
+    
     print("Loading data...")
     transactions = pd.read_csv("data/transactions_train.csv", parse_dates=['t_dat'])
     articles = pd.read_csv("data/articles.csv")
@@ -242,54 +244,55 @@ if __name__ == "__main__":
         .merge(articles[['article_id', 'prod_name', 'product_group_name']], on="article_id", how="left")\
         .merge(customers[['customer_id', 'age']], on="customer_id", how="left")
 
-    print("Initializing feature generator...")
-    feature_generator = FeatureGenerator(features, derivative_features, derivative_functions)
-    print("Fitting feature generator...")
-    feature_generator.fit(transactions, articles, customers, verbose=True)
+    # print("Initializing feature generator...")
+    # feature_generator = FeatureGenerator(features, derivative_features, derivative_functions)
+    # print("Fitting feature generator...")
+    # feature_generator.fit(transactions, articles, customers, verbose=True)
+
+    feature_generator = pickle.load(open('saved_models/feature_generator.pkl', 'rb'))
 
     # import pickle
     # with open('saved_models/feature_generator.pkl', 'wb') as f:
     #     pickle.dump(feature_generator, f)
 
-    recommendations = pd.read_csv("data/recommendations.csv")\
-        .rename(columns={'week': '7d', 'recommendation': 'article_id'})
-    
-    positive_samples = transactions[['article_id', 'customer_id', '7d']]\
-        .drop_duplicates()
-    
+    import os
 
-    negative_samples = pd.merge(
-        recommendations,
-        positive_samples,
-        on=['customer_id', '7d', 'article_id'],
-        how='left',
-        indicator=True
-    )
+    batch_size = 200_000  # Adjust as needed for memory
+    input_path = "data/labeled_recommendations.csv"
+    output_path = "data/ranker_train.csv"
 
-    # Filter to only keep samples not in positive
-    negative_samples = negative_samples[negative_samples['_merge'] == 'left_only']
+    # Remove output file if it exists
+    if os.path.exists(output_path):
+        os.remove(output_path)
 
-    # Drop the merge indicator column
-    negative_samples = negative_samples.drop('_merge', axis=1)
+    first = True
+    reader = pd.read_csv(input_path, chunksize=batch_size)
+    for i, samples in enumerate(reader):
+        print(f"Processing batch {i+1}...")
 
-    positive_samples["label"] = 1
-    negative_samples['label'] = 0
+        # We want to predict the next week's purchases, so we need to shift the week by 1
+        samples['7d'] -= 1
 
-    samples = pd.concat([positive_samples, negative_samples.sample(1_000_000)])
+        samples = samples.merge(window_table, on='7d', how='left')
+        samples = samples.merge(articles[['article_id', 'prod_name', 'product_group_name']], on='article_id', how='left')
+        samples = samples.merge(customers[['customer_id', 'age']], on='customer_id', how='left')
 
-    # We want to predict the next week's purchases, so we need to shift the week by 1
-    samples['7d'] -= 1
-    
-    samples = samples.merge(window_table, on='7d', how='left')
-    samples = samples.merge(articles[['article_id', 'prod_name', 'product_group_name']], on='article_id', how='left')
-    samples = samples.merge(customers[['customer_id', 'age']], on='customer_id', how='left')
+        print("Transforming recommendations...")
+        featured_recommendations = feature_generator.transform(samples, verbose=True)
 
-    print("Transforming recommendations...")
-    featured_recommendations = feature_generator.transform(samples, verbose=True)
+        featured_recommendations['7d'] += 1
 
-    featured_recommendations['7d'] += 1
+        featured_recommendations = featured_recommendations.drop(columns=['35d'], axis=1)
+        featured_recommendations = featured_recommendations.merge(window_table, on='7d', how='left')
 
-    featured_recommendations = featured_recommendations.drop(columns=['35d'], axis=1)
-    featured_recommendations = featured_recommendations.merge(window_table, on='7d', how='left')
+        # Write to CSV in append mode, header only for first batch
+        featured_recommendations.to_csv(
+            output_path,
+            mode='w' if first else 'a',
+            index=False,
+            header=first
+        )
+        first = False
 
-    featured_recommendations.to_csv("data/ranker_train.csv", index=False)
+    print(f"Done. Output written to {output_path}")
+# %%
