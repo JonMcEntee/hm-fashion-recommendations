@@ -275,7 +275,7 @@ def create_recommendation_generator(
     return recommendation_generator
 #%%
 if __name__ == "__main__":
-    from src.evaluation.metrics import coverage
+    from src.evaluation.metrics import hit_rate
 
     print("Loading data...")
     transactions = pd.read_csv("data/transactions_train.csv", parse_dates=['t_dat'])
@@ -287,7 +287,9 @@ if __name__ == "__main__":
 
     print("Creating recommender...")
     recommender = create_recommendation_generator(transactions, articles)
+    
 
     print("Computing coverage...")
-    coverage_df = coverage(recommender, transactions, k=12)
-    coverage_df.to_csv("results/generate_recommendations_coverage.csv", index=False)
+    hit_rate_df = hit_rate(recommender, transactions, calculate_by = ["customer_id", "7d"], summarize_by = ["7d"])
+    hit_rate_df.to_csv("results/generate_recommendations_hit_rate.csv", index=False)
+# %%

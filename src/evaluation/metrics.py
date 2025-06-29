@@ -86,17 +86,17 @@ def mapk(recommender: Callable, test: pd.DataFrame, k: int = 12) -> float:
     
     return float(np.mean(ap_per_customer))
 
-def coverage(recommender: Callable, transactions: pd.DataFrame, k: int = 12) -> pd.DataFrame:
+def hit_rate(recommender: Callable, transactions: pd.DataFrame, k: int = 100) -> pd.DataFrame:
     """
     Compute the percentage of customer-article transactions for each week that were recommended by the recommender.
 
     Args:
         recommender (Callable): Function that generates recommendations for a list of customers and a week (must accept customers, week, k).
         transactions (pd.DataFrame): DataFrame with columns ['customer_id', 'article_id', '7d'] representing transactions.
-        k (int, optional): Number of recommendations per customer (default: 12).
+        k (int, optional): Number of recommendations per customer (default: 100).
 
     Returns:
-        pd.DataFrame: DataFrame with columns ['7d', 'covered', 'total', 'percent'] showing the coverage per week.
+        pd.DataFrame: DataFrame with columns ['7d', 'covered', 'total', 'percent'] showing the hit_rate per week.
     """
     results = []
     # Ensure correct columns
@@ -116,6 +116,6 @@ def coverage(recommender: Callable, transactions: pd.DataFrame, k: int = 12) -> 
         merged = week_data.merge(recs, on=['customer_id', 'article_id'], how='left', indicator=True)
         covered = (merged['_merge'] == 'both').sum()
         total = len(merged)
-        coverage_pct = covered / total if total > 0 else 0.0
-        results.append({'7d': week, 'covered': covered, 'total': total, 'percent': coverage_pct})
+        hit_rate_pct = covered / total if total > 0 else 0.0
+        results.append({'7d': week, 'covered': covered, 'total': total, 'percent': hit_rate_pct})
     return pd.DataFrame(results) 
