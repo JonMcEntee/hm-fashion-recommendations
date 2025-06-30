@@ -1,139 +1,114 @@
-import pytest
 import pandas as pd
+from datetime import datetime, timedelta
 from src.models.generate_recommendations import create_same_product_code
 
-def test_basic_functionality():
-    """Test that articles with the same product code are found correctly for each customer."""
-    articles = pd.DataFrame({
-        'article_id': [1001, 1002, 1003, 1004],
-        'product_code': [100, 100, 200, 300]
+def make_transactions(customers, article_ids, week_numbers=None, base_date=None):
+    if base_date is None:
+        base_date = datetime(2020, 9, 1)
+    if week_numbers is None:
+        week_numbers = [0 for _ in customers]
+    t_dat = [base_date + timedelta(days=7 * w) for w in week_numbers]
+    return pd.DataFrame({
+        'customer_id': customers,
+        'article_id': article_ids,
+        't_dat': t_dat
     })
-    previous_purchases = pd.DataFrame({
-        'customer_id': ['C1', 'C2'],
-        'recommendation': [1001, 1003]
-    })
-    same_code_finder = create_same_product_code(articles)
-    result = same_code_finder(previous_purchases)
-    # For C1 (1001, product_code 100): should get 1001, 1002
-    # For C2 (1003, product_code 200): should get 1003
-    c1_articles = set(result[result['customer_id'] == 'C1']['recommendation'])
-    c2_articles = set(result[result['customer_id'] == 'C2']['recommendation'])
-    assert c1_articles == {1001, 1002}
-    assert c2_articles == {1003}
 
-def test_multiple_previous_purchases_per_customer():
-    """Test with multiple previous purchases for a single customer."""
+def test_basic_same_product_code():
     articles = pd.DataFrame({
-        'article_id': [1001, 1002, 1003, 1004, 1005],
-        'product_code': [100, 100, 200, 300, 200]
+        'article_id': [1, 2, 3, 4],
+        'product_code': [10, 10, 20, 30]
     })
-    previous_purchases = pd.DataFrame({
-        'customer_id': ['C1', 'C1'],
-        'recommendation': [1001, 1003]
-    })
-    same_code_finder = create_same_product_code(articles)
-    result = same_code_finder(previous_purchases)
-    # C1 has 1001 (100) and 1003 (200), so should get 1001, 1002, 1003, 1005
-    c1_articles = set(result[result['customer_id'] == 'C1']['recommendation'])
-    assert c1_articles == {1001, 1002, 1003, 1005}
-
-def test_no_matches():
-    """Test when there are no matching product codes for a customer."""
-    articles = pd.DataFrame({
-        'article_id': [1001, 1002, 1003],
-        'product_code': [100, 200, 300]
-    })
-    previous_purchases = pd.DataFrame({
-        'customer_id': ['C1'],
-        'recommendation': [1004]  # 1004 not in articles
-    })
-    same_code_finder = create_same_product_code(articles)
-    result = same_code_finder(previous_purchases)
-    # Should return empty DataFrame
+    transactions = make_transactions(['A', 'A'], [1, 1], week_numbers=[0, 1])
+    same_code_finder = create_same_product_code(transactions, articles)
+    result = same_code_finder(['A'], week=1, k=10)
     print(result)
-    assert result.empty
+    assert set(result['article_id']) == {1, 2}
+
+def test_multiple_previous_purchases():
+    articles = pd.DataFrame({
+        'article_id': [1, 2, 3, 4, 5],
+        'product_code': [10, 10, 20, 30, 20]
+    })
+    transactions = make_transactions(['A', 'A'], [1, 3], week_numbers=[0, 0])
+    same_code_finder = create_same_product_code(transactions, articles)
+    result = same_code_finder(['A'], week=1, k=10)
+    assert set(result['article_id']) == {1, 2, 3, 5}
 
 def test_duplicates_removed():
-    """Test that duplicate articles are not returned for a customer."""
     articles = pd.DataFrame({
-        'article_id': [1001, 1002, 1003],
-        'product_code': [100, 100, 100]
+        'article_id': [1, 2, 3],
+        'product_code': [10, 10, 10]
     })
-    previous_purchases = pd.DataFrame({
-        'customer_id': ['C1', 'C1'],
-        'recommendation': [1001, 1002]
-    })
-    same_code_finder = create_same_product_code(articles)
-    result = same_code_finder(previous_purchases)
-    # Should return each article only once for C1
-    c1_articles = result[result['customer_id'] == 'C1']['recommendation']
-    assert set(c1_articles) == {1001, 1002, 1003}
-    assert c1_articles.duplicated().sum() == 0
-
-def test_empty_previous_purchases():
-    """Test with empty previous purchases DataFrame."""
-    articles = pd.DataFrame({
-        'article_id': [1001, 1002],
-        'product_code': [100, 200]
-    })
-    previous_purchases = pd.DataFrame({'customer_id': [], 'recommendation': []})
-    same_code_finder = create_same_product_code(articles)
-    result = same_code_finder(previous_purchases)
-    # Should return empty DataFrame
-    assert result.empty
+    transactions = make_transactions(['A', 'A'], [1, 2], week_numbers=[0, 0])
+    same_code_finder = create_same_product_code(transactions, articles)
+    result = same_code_finder(['A'], week=1, k=10)
+    assert set(result['article_id']) == {1, 2, 3}
+    assert result['article_id'].duplicated().sum() == 0
 
 def test_multiple_customers():
-    """Test that each customer gets correct articles for their product codes."""
     articles = pd.DataFrame({
-        'article_id': [1001, 1002, 1003, 1004, 1005],
-        'product_code': [100, 100, 200, 300, 200]
+        'article_id': [1, 2, 3, 4, 5],
+        'product_code': [10, 10, 20, 30, 20]
     })
-    previous_purchases = pd.DataFrame({
-        'customer_id': ['C1', 'C2', 'C2'],
-        'recommendation': [1001, 1003, 1004]
-    })
-    same_code_finder = create_same_product_code(articles)
-    result = same_code_finder(previous_purchases)
-    # C1: 1001 (100) -> 1001, 1002
-    # C2: 1003 (200), 1004 (300) -> 1003, 1005, 1004
-    c1_articles = set(result[result['customer_id'] == 'C1']['recommendation'])
-    c2_articles = set(result[result['customer_id'] == 'C2']['recommendation'])
-    assert c1_articles == {1001, 1002}
-    assert c2_articles == {1003, 1004, 1005}
+    transactions = make_transactions(['A', 'B', 'B'], [1, 3, 4], week_numbers=[0, 0, 0])
+    same_code_finder = create_same_product_code(transactions, articles)
+    result = same_code_finder(['A', 'B'], week=1, k=10)
+    a_articles = set(result[result['customer_id'] == 'A']['article_id'])
+    b_articles = set(result[result['customer_id'] == 'B']['article_id'])
+    assert a_articles == {1, 2}
+    assert b_articles == {3, 4, 5}
 
-def test_same_product_code_data_types():
-    """Test that output DataFrame columns have correct data types."""
+def test_output_columns_and_types():
     articles = pd.DataFrame({
-        'article_id': [1001, 1002, 1003, 1004, 1005],
-        'product_code': [100, 100, 200, 300, 200]
+        'article_id': [1, 2, 3],
+        'product_code': [10, 10, 20]
     })
-    previous_purchases = pd.DataFrame({
-        'customer_id': ['C1', 'C2', 'C2'],
-        'recommendation': [1001, 1003, 1004]
+    transactions = make_transactions(['A'], [1], week_numbers=[0])
+    same_code_finder = create_same_product_code(transactions, articles)
+    result = same_code_finder(['A'], week=1, k=10)
+    expected_columns = {'customer_id', 'article_id'}
+    assert expected_columns.issubset(set(result.columns))
+    assert result['customer_id'].dtype == 'object'
+    if len(result) > 0:
+        assert result['article_id'].dtype in ['int64', 'int32']
+        for rec in result['article_id']:
+            assert isinstance(rec, int)
+
+def test_output_is_ranked_by_time():
+    articles = pd.DataFrame({
+        'article_id': [1, 2, 3],
+        'product_code': [10, 10, 10]
     })
-    
-    same_code_finder = create_same_product_code(articles)
-    result = same_code_finder(previous_purchases)
-    
-    # Check that DataFrame is returned
-    assert isinstance(result, pd.DataFrame)
-    
-    # Check column names
-    expected_columns = {'customer_id', 'recommendation'}
-    assert set(result.columns) == expected_columns
-    
-    # Check data types
-    assert result['customer_id'].dtype == 'object', "customer_id should be object type"
-    
-    # Check recommendation column data type - should be integer for numeric article_ids
-    if len(result) > 0:
-        assert result['recommendation'].dtype in ['int64', 'int32'], "recommendation should be integer type"
-    
-    # Additional check: ensure no float values in recommendation column
-    if len(result) > 0:
-        recommendations_list = result['recommendation'].tolist()
-        for rec in recommendations_list:
-            # Check that recommendations are integers, not floats
-            assert isinstance(rec, int), f"Recommendation {rec} should be integer, not float"
-            # Ensure no .0 suffix by checking the value equals its integer conversion
-            assert rec == int(rec), f"Recommendation {rec} should be integer, not float" 
+    # Create transactions for the same customer and product code, different weeks
+    transactions = make_transactions(
+        ['A', 'A', 'A'],
+        [1, 2, 3],
+        week_numbers=[0, 1, 2]
+    )
+    same_code_finder = create_same_product_code(transactions, articles)
+    # Use week=3 so all transactions are included as history
+    result = same_code_finder(['A'], week=3, k=10)
+    # The output should be sorted by recency (most recent transaction first)
+    # The most recent transaction is for article 3, then 2, then 1
+    expected_order = [3, 2, 1]
+    actual_order = list(result['article_id'])
+    assert actual_order == expected_order
+
+def test_k_limits_number_of_recommendations():
+    articles = pd.DataFrame({
+        'article_id': list(range(1, 11)),
+        'product_code': [10] * 10
+    })
+    # 10 transactions for the same customer, different articles
+    transactions = make_transactions(
+        ['A'] * 10,
+        list(range(1, 11)),
+        week_numbers=list(range(10))
+    )
+    same_code_finder = create_same_product_code(transactions, articles)
+    # Use week=11 so all transactions are included as history
+    k = 5
+    result = same_code_finder(['A'], week=11, k=k)
+    # Should be at most k recommendations for customer 'A'
+    assert len(result[result['customer_id'] == 'A']) <= k

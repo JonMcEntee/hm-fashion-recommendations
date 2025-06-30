@@ -34,11 +34,11 @@ def test_basic_functionality(sample_transactions):
     
     # Check basic structure
     assert isinstance(result, pd.DataFrame)
-    assert set(result.columns) == {'customer_id', 'recommendation'}
+    assert set(result.columns) == {'customer_id', 'article_id'}
     
     # Check content
     # C1's history before week 1 should only include 1001 (from week 0)
-    articles = set(result['recommendation'])
+    articles = set(result['article_id'])
     assert articles == {1001}
     
     # All rows should be for C1
@@ -54,13 +54,13 @@ def test_week_filtering(sample_transactions):
     week2 = recommender(['C1'], week=2)
     
     # Week 0 should have no purchases (no data before week 0)
-    assert set(week0['recommendation']) == set()
+    assert set(week0['article_id']) == set()
     
     # Week 1 should only have 1001 (from week 0, before week 1)
-    assert set(week1['recommendation']) == {1001}
+    assert set(week1['article_id']) == {1001}
     
     # Week 2 should have 1001 and 1003 (from weeks 0 and 1, before week 2)
-    assert set(week2['recommendation']) == {1001, 1003}
+    assert set(week2['article_id']) == {1001, 1003}
 
 def test_multiple_customers(sample_transactions):
     """Test retrieving history for multiple customers."""
@@ -73,8 +73,8 @@ def test_multiple_customers(sample_transactions):
     assert set(result['customer_id']) == {'C1', 'C2'}
     
     # Check specific customer histories
-    c1_articles = set(result[result['customer_id'] == 'C1']['recommendation'])
-    c2_articles = set(result[result['customer_id'] == 'C2']['recommendation'])
+    c1_articles = set(result[result['customer_id'] == 'C1']['article_id'])
+    c2_articles = set(result[result['customer_id'] == 'C2']['article_id'])
     
     # C1: 1001 (week 0), 1003 (week 1) - both before week 2
     assert c1_articles == {1001, 1003}
@@ -90,7 +90,7 @@ def test_duplicate_purchases(sample_transactions):
     result = recommender(['C1'], week=2)
     
     # Should only appear once in the results
-    a3_count = len(result[result['recommendation'] == 1003])
+    a3_count = len(result[result['article_id'] == 1003])
     assert a3_count == 1
 
 def test_nonexistent_customer(sample_transactions):
@@ -101,7 +101,7 @@ def test_nonexistent_customer(sample_transactions):
     
     # Should return empty DataFrame with correct structure
     assert isinstance(result, pd.DataFrame)
-    assert set(result.columns) == {'customer_id', 'recommendation'}
+    assert set(result.columns) == {'customer_id', 'article_id'}
     assert len(result) == 0
 
 def test_empty_customer_list(sample_transactions):
@@ -112,7 +112,7 @@ def test_empty_customer_list(sample_transactions):
     
     # Should return empty DataFrame with correct structure
     assert isinstance(result, pd.DataFrame)
-    assert set(result.columns) == {'customer_id', 'recommendation'}
+    assert set(result.columns) == {'customer_id', 'article_id'}
     assert len(result) == 0
 
 def test_future_week(sample_transactions):
@@ -123,7 +123,7 @@ def test_future_week(sample_transactions):
     result = recommender(['C1'], week=10)
     
     # Should return all historical purchases for the customer (before week 10)
-    assert set(result['recommendation']) == {1001, 1003, 1005}
+    assert set(result['article_id']) == {1001, 1003, 1005}
 
 def test_negative_week(sample_transactions):
     """Test behavior with negative week number."""
@@ -150,7 +150,7 @@ def test_previous_purchases_data_types(sample_transactions):
         assert isinstance(result, pd.DataFrame)
         
         # Check column names
-        expected_columns = {'customer_id', 'recommendation'}
+        expected_columns = {'customer_id', 'article_id'}
         assert set(result.columns) == expected_columns
         
         # Check data types
@@ -158,11 +158,11 @@ def test_previous_purchases_data_types(sample_transactions):
         
         # Check recommendation column data type - should be integer for numeric article_ids
         if len(result) > 0:
-            assert result['recommendation'].dtype in ['int64', 'int32'], f"recommendation should be integer type for week {week}"
+            assert result['article_id'].dtype in ['int64', 'int32'], f"article_id should be integer type for week {week}"
         
         # Additional check: ensure no float values in recommendation column
         if len(result) > 0:
-            recommendations_list = result['recommendation'].tolist()
+            recommendations_list = result['article_id'].tolist()
             for rec in recommendations_list:
                 # Check that recommendations are integers, not floats
                 assert isinstance(rec, int), f"Recommendation {rec} should be integer, not float for week {week}"
@@ -177,11 +177,11 @@ def test_previous_purchases_data_types(sample_transactions):
             # Week 1 should only have purchases from week 0
             if len(result) > 0:
                 expected_articles = {1001, 1002}  # From week 0
-                actual_articles = set(result['recommendation'])
+                actual_articles = set(result['article_id'])
                 assert actual_articles.issubset(expected_articles), f"Week 1 should only contain articles from week 0: {actual_articles}"
         elif week == 2:
             # Week 2 should have purchases from weeks 0 and 1
             if len(result) > 0:
                 expected_articles = {1001, 1002, 1003, 1004}  # From weeks 0 and 1
-                actual_articles = set(result['recommendation'])
+                actual_articles = set(result['article_id'])
                 assert actual_articles.issubset(expected_articles), f"Week 2 should only contain articles from weeks 0 and 1: {actual_articles}"
