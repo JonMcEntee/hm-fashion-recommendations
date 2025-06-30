@@ -28,4 +28,7 @@ def load_data(
     transactions['customer_id'] = transactions['customer_id'].map(customer_map)
     customers['customer_id'] = customers['customer_id'].map(customer_map)
 
+    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
+    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
+
     return transactions, articles, customers, customer_map, reverse_customer_map
