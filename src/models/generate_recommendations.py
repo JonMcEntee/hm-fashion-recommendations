@@ -12,6 +12,7 @@ project_root = "/Users/jonathanmcentee/Documents/GitHub/hm-fashion-recommendatio
 os.chdir(project_root)
 #%%
 import pandas as pd
+from tqdm import tqdm
 from typing import List, Callable, Optional
 from src.models.als_model import create_als_recommender
 from src.models.baseline_model import create_baseline_recommender, create_temporal_baseline
@@ -109,7 +110,7 @@ def create_previous_purchases(
     transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
     
     # Create a clean copy with only needed columns to minimize memory usage
-    transactions = transactions[['customer_id', 'week', 'article_id']].copy()
+    transactions = transactions[['customer_id', 'week', 'article_id', 't_dat']].copy()
 
     def previous_purchases(customers: List[str], week: int, k: int = 12) -> pd.DataFrame:
         """
@@ -139,16 +140,18 @@ def create_previous_purchases(
         filtered_history = filtered_history[filtered_history['week'] < week]
         
         # Get unique customer-article pairs and create a clean copy
-        filtered_history = filtered_history[['customer_id', 'article_id']]\
+        filtered_history = filtered_history[['customer_id', 'article_id', 't_dat']]\
+            .sort_values(by='t_dat', ascending=False)\
             .drop_duplicates()\
             .copy()
         
-        return filtered_history
+        return filtered_history[['customer_id', 'article_id']].groupby('customer_id').head(k)
     
     return previous_purchases
 
 
 def create_same_product_code(
+    transactions: pd.DataFrame,
     articles: pd.DataFrame,
 ) -> Callable[[pd.DataFrame], pd.DataFrame]:
     """
@@ -171,12 +174,25 @@ def create_same_product_code(
         same_code_finder = create_same_product_code(articles_df)
         similar_articles = same_code_finder(previous_purchases_df)
     """
+    # Convert transaction dates to week numbers relative to the last week
+    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
+    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
+    
+    # Create a clean copy with only needed columns to minimize memory usage
+    transactions = transactions[['customer_id', 'week', 'article_id', 't_dat']].copy()
+    
+    transactions["time_decay"] = transactions["week"].apply(lambda x: 0.95 ** (last_week - x))
+    weighted_transactions = transactions.groupby(['customer_id', 'article_id', 'week'])['time_decay'].agg('sum').reset_index()
+    weighted_transactions['cumulative_weight'] = weighted_transactions\
+        .sort_values(by='week', ascending=True)\
+        .groupby(['customer_id', 'article_id'])["time_decay"]\
+        .cumsum()
 
     # Build an index mapping each article to its product code
     index = articles[['article_id', 'product_code']]\
         .copy()
-
-    def same_product_code(previous_purchases: pd.DataFrame) -> pd.DataFrame:
+    
+    def same_product_code(customers: List[str], week: int, k: int = 12) -> pd.DataFrame:
         """
         Find all articles that share a product code with the given previous purchases.
 
@@ -193,8 +209,23 @@ def create_same_product_code(
         Usage:
             similar_articles = same_code_finder(previous_purchases_df)
         """
+        # Filter transactions for the specified customers
+        filtered_history = transactions[(transactions['customer_id'].isin(customers))]
+        
+        # Only include interactions up to the specified week
+        filtered_history = filtered_history[filtered_history['week'] < week]
+        
+        # Get unique customer-article pairs and create a clean copy
+        filtered_history = filtered_history[['customer_id', 'article_id', 't_dat']]\
+            .sort_values(by='t_dat', ascending=False)\
+            .drop_duplicates()\
+            .copy()
+        
+        print(f"Filtered history: {filtered_history}")
+        
+        previous_purchases = filtered_history[['customer_id', 'article_id']].copy()
+
         # Merge previous purchases with the index to get their product codes
-        previous_purchases = previous_purchases.copy()
         previous_purchases = (
             previous_purchases
             .merge(index, on='article_id', how='inner') # Add product_code to previous purchases
@@ -207,6 +238,20 @@ def create_same_product_code(
             .merge(previous_purchases, on='product_code', how='inner') # Find all articles with these product codes
             .drop(columns=['product_code'], axis=1)                    # Remove product_code for output
         )
+        print(f"Same code: {same_code}")
+
+        same_code['week'] = week
+
+        same_code = same_code.merge(weighted_transactions, on=['customer_id', 'article_id', 'week'], how='left')
+        # same_code[["time_decay", "cumulative_weight"]] = same_code[["time_decay", "cumulative_weight"]].fillna(0)
+        print(f"Same code after merging: {same_code}")
+        same_code = same_code[same_code["week"] <= week]
+        print(f"Same code after filtering week: {same_code}")
+        same_code = same_code.sort_values(by='cumulative_weight', ascending=False)
+        print(f"Same code after sorting: {same_code}")
+        same_code = same_code.groupby('customer_id').head(k)
+        print(f"Same code after grouping: {same_code}")
+
         return same_code
 
     return same_product_code
@@ -303,16 +348,15 @@ def batch_generate_recommendations(
     transactions = transactions.copy()
     # Calculate the week number for each transaction
     last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
-    transactions['7d'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
+    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
 
     # Iterate over each week in the specified range
-    for week in range(first_week, last_week + 1):
-        if verbose:
-            print(f"  Calculating week {week}...")
+    for week in tqdm(range(first_week, last_week + 1), disable=not verbose):
         # Get unique customers for the current week
-        customers = transactions[transactions['7d'] == week]['customer_id'].unique()
+        customers = transactions[transactions['week'] == week]['customer_id'].unique()
         # Generate recommendations for these customers
         recommendations = recommender(customers, week, k)
+        recommendations['week'] = week
 
         # Save recommendations to CSV (overwrite for first week, append for others)
         if week == first_week:
@@ -330,13 +374,13 @@ if __name__ == "__main__":
     customers = transactions['customer_id'].unique()
 
     print("Generating recommendations...")
-    weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
-    batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True)
+
+    # weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
+    # batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True)
 
     # previous_purchases = create_previous_purchases(transactions)
-    # batch_generate_recommendations(customers, previous_purchases, "data/previous_purchases.csv")
+    # batch_generate_recommendations(transactions, previous_purchases, "data/previous_purchases.csv", verbose=True)
 
-    # same_product_code = create_same_product_code(articles)
-    # recommender = lambda customers, week, k: same_product_code(previous_purchases(customers, week, k))
-    # batch_generate_recommendations(customers, recommender, "data/same_product_code.csv")
+    same_product_code = create_same_product_code(transactions, articles)
+    batch_generate_recommendations(transactions, same_product_code, "data/same_product_code.csv", verbose=True)
 # %%
