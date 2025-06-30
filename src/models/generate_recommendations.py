@@ -15,8 +15,8 @@ import pandas as pd
 from tqdm import tqdm
 from typing import List, Callable, Optional
 from src.models.als_model import create_als_recommender
-from src.models.baseline_model import create_baseline_recommender, create_temporal_baseline
 from collections import defaultdict
+from src.data_load.data_load import load_data
 
 #%%
 def create_weekly_bestsellers_recommender(
@@ -64,7 +64,6 @@ def create_weekly_bestsellers_recommender(
         Returns:
             pd.DataFrame: DataFrame with columns:
                 - customer_id
-                - rank
                 - article_id
             Each customer receives the same top-k bestsellers from the previous week.
 
@@ -76,7 +75,6 @@ def create_weekly_bestsellers_recommender(
         num_recommendations = len(recommendations)
         return pd.DataFrame({
             "customer_id": [customer for customer in customers for _ in range(num_recommendations)],
-            "rank": list(range(1, num_recommendations+1)) * len(customers),
             "article_id": recommendations * len(customers)
         })
     
@@ -220,9 +218,7 @@ def create_same_product_code(
             .sort_values(by='t_dat', ascending=False)\
             .drop_duplicates()\
             .copy()
-        
-        print(f"Filtered history: {filtered_history}")
-        
+                
         previous_purchases = filtered_history[['customer_id', 'article_id']].copy()
 
         # Merge previous purchases with the index to get their product codes
@@ -238,21 +234,26 @@ def create_same_product_code(
             .merge(previous_purchases, on='product_code', how='inner') # Find all articles with these product codes
             .drop(columns=['product_code'], axis=1)                    # Remove product_code for output
         )
-        print(f"Same code: {same_code}")
 
-        same_code['week'] = week
+        # Merge with weighted_transactions to add weights and time decay, filling missing values with 0
+        same_code = (
+            same_code
+            .merge(weighted_transactions, on=['customer_id', 'article_id'], how='outer')
+            .fillna({"time_decay": 0, "cumulative_weight": 0, "week": 0})
+        )
 
-        same_code = same_code.merge(weighted_transactions, on=['customer_id', 'article_id', 'week'], how='left')
-        # same_code[["time_decay", "cumulative_weight"]] = same_code[["time_decay", "cumulative_weight"]].fillna(0)
-        print(f"Same code after merging: {same_code}")
-        same_code = same_code[same_code["week"] <= week]
-        print(f"Same code after filtering week: {same_code}")
-        same_code = same_code.sort_values(by='cumulative_weight', ascending=False)
-        print(f"Same code after sorting: {same_code}")
-        same_code = same_code.groupby('customer_id').head(k)
-        print(f"Same code after grouping: {same_code}")
+        # Filter to only include articles less than the specified week
+        same_code = same_code[same_code["week"] < week]
 
-        return same_code
+        # Sort by cumulative_weight (descending) and select top-k per customer
+        same_code = (
+            same_code
+            .sort_values(by=['customer_id', 'cumulative_weight'], ascending=False)
+            .groupby('customer_id', as_index=False)
+            .head(k)
+        )
+
+        return same_code[['customer_id', 'article_id']]
 
     return same_product_code
 
@@ -325,7 +326,8 @@ def batch_generate_recommendations(
         file_path: str,
         k: int = 100,
         first_week: int = 50,
-        verbose: bool = False
+        verbose: bool = False,
+        to_csv: bool = False
     ) -> pd.DataFrame:
     """
     Generate and save recommendations for each week in batch mode using a given recommender function.
@@ -351,6 +353,7 @@ def batch_generate_recommendations(
     transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
 
     # Iterate over each week in the specified range
+    batch_recommendations = None
     for week in tqdm(range(first_week, last_week + 1), disable=not verbose):
         # Get unique customers for the current week
         customers = transactions[transactions['week'] == week]['customer_id'].unique()
@@ -360,27 +363,32 @@ def batch_generate_recommendations(
 
         # Save recommendations to CSV (overwrite for first week, append for others)
         if week == first_week:
-            recommendations.to_csv(file_path, index=False)
+            if to_csv:
+                recommendations.to_csv(file_path, index=False)
+            else:
+                batch_recommendations = recommendations
         else:
-            recommendations.to_csv(file_path, mode='a', header=False, index=False)
-    
+            if to_csv:
+                recommendations.to_csv(file_path, mode='a', header=False, index=False)
+            else:
+                recommendations.to_parquet(file_path, mode='a', index=False)
+
+    return batch_recommendations
 #%%
 if __name__ == "__main__":
     from src.evaluation.metrics import hit_rate
 
     print("Loading data...")
-    transactions = pd.read_csv("data/transactions_train.csv", parse_dates=['t_dat'])
-    articles = pd.read_csv("data/articles.csv")
-    customers = transactions['customer_id'].unique()
+    transactions, articles, customers, customer_map, reverse_customer_map = load_data()
 
-    print("Generating recommendations...")
+    print("Generating weekly bestsellers...")
+    weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
+    batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True, to_csv=True)
 
-    # weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
-    # batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True)
+    print("Generating previous purchases...")
+    previous_purchases = create_previous_purchases(transactions)
+    batch_generate_recommendations(transactions, previous_purchases, "data/previous_purchases.csv", verbose=True, to_csv=True)
 
-    # previous_purchases = create_previous_purchases(transactions)
-    # batch_generate_recommendations(transactions, previous_purchases, "data/previous_purchases.csv", verbose=True)
-
+    print("Generating same product code...")
     same_product_code = create_same_product_code(transactions, articles)
-    batch_generate_recommendations(transactions, same_product_code, "data/same_product_code.csv", verbose=True)
-# %%
+    batch_generate_recommendations(transactions, same_product_code, "data/same_product_code.csv", verbose=True, to_csv=True)
