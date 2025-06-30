@@ -273,6 +273,53 @@ def create_recommendation_generator(
         return recommendations
 
     return recommendation_generator
+
+def batch_generate_recommendations(
+        transactions: pd.DataFrame,
+        recommender: Callable[[List[str], int, int], pd.DataFrame],
+        file_path: str,
+        k: int = 100,
+        first_week: int = 50,
+        verbose: bool = False
+    ) -> pd.DataFrame:
+    """
+    Generate and save recommendations for each week in batch mode using a given recommender function.
+
+    Iterates over each week in the transaction data, generates recommendations for all customers in that week
+    using the provided recommender, and saves the results to a CSV file. The first week's results overwrite the file,
+    and subsequent weeks are appended.
+
+    Args:
+        transactions (pd.DataFrame): DataFrame containing transaction data with 't_dat' and 'customer_id' columns.
+        recommender (Callable): Recommendation function with signature (customers, week, k) -> pd.DataFrame.
+        file_path (str): Path to the output CSV file.
+        k (int, optional): Number of recommendations per customer. Defaults to 100.
+        first_week (int, optional): The first week to start generating recommendations. Defaults to 50.
+        verbose (bool, optional): If True, print progress messages. Defaults to False.
+
+    Returns:
+        None. Results are saved to file_path.
+    """
+    transactions = transactions.copy()
+    # Calculate the week number for each transaction
+    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
+    transactions['7d'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
+
+    # Iterate over each week in the specified range
+    for week in range(first_week, last_week + 1):
+        if verbose:
+            print(f"  Calculating week {week}...")
+        # Get unique customers for the current week
+        customers = transactions[transactions['7d'] == week]['customer_id'].unique()
+        # Generate recommendations for these customers
+        recommendations = recommender(customers, week, k)
+
+        # Save recommendations to CSV (overwrite for first week, append for others)
+        if week == first_week:
+            recommendations.to_csv(file_path, index=False)
+        else:
+            recommendations.to_csv(file_path, mode='a', header=False, index=False)
+    
 #%%
 if __name__ == "__main__":
     from src.evaluation.metrics import hit_rate
@@ -280,16 +327,16 @@ if __name__ == "__main__":
     print("Loading data...")
     transactions = pd.read_csv("data/transactions_train.csv", parse_dates=['t_dat'])
     articles = pd.read_csv("data/articles.csv")
+    customers = transactions['customer_id'].unique()
 
-    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
-    transactions['7d'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
-    
+    print("Generating recommendations...")
+    weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
+    batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True)
 
-    print("Creating recommender...")
-    recommender = create_recommendation_generator(transactions, articles)
-    
+    # previous_purchases = create_previous_purchases(transactions)
+    # batch_generate_recommendations(customers, previous_purchases, "data/previous_purchases.csv")
 
-    print("Computing coverage...")
-    hit_rate_df = hit_rate(recommender, transactions, calculate_by = ["customer_id", "7d"], summarize_by = ["7d"])
-    hit_rate_df.to_csv("results/generate_recommendations_hit_rate.csv", index=False)
+    # same_product_code = create_same_product_code(articles)
+    # recommender = lambda customers, week, k: same_product_code(previous_purchases(customers, week, k))
+    # batch_generate_recommendations(customers, recommender, "data/same_product_code.csv")
 # %%
