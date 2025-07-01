@@ -86,36 +86,36 @@ def mapk(recommender: Callable, test: pd.DataFrame, k: int = 12) -> float:
     
     return float(np.mean(ap_per_customer))
 
-def hit_rate(recommender: Callable, transactions: pd.DataFrame, k: int = 100) -> pd.DataFrame:
+def hit_rate(recommendations: pd.DataFrame, transactions: pd.DataFrame, k: int = 100) -> pd.DataFrame:
     """
-    Compute the percentage of customer-article transactions for each week that were recommended by the recommender.
+    Compute the percentage of customer-article transactions for each week that were recommended.
 
     Args:
-        recommender (Callable): Function that generates recommendations for a list of customers and a week (must accept customers, week, k).
-        transactions (pd.DataFrame): DataFrame with columns ['customer_id', 'article_id', '7d'] representing transactions.
+        recommendations (pd.DataFrame): DataFrame with columns ['customer_id', 'article_id', 'week'] representing recommendations.
+        transactions (pd.DataFrame): DataFrame with columns ['customer_id', 'article_id', 'week'] representing transactions.
         k (int, optional): Number of recommendations per customer (default: 100).
 
     Returns:
-        pd.DataFrame: DataFrame with columns ['7d', 'covered', 'total', 'percent'] showing the hit_rate per week.
+        pd.DataFrame: DataFrame with columns ['covered', 'total', 'percent'] showing the hit_rate per week.
     """
-    results = []
     # Ensure correct columns
-    assert {'customer_id', 'article_id', '7d'}.issubset(transactions.columns), "transactions must have 'customer_id', 'article_id', '7d' columns"
-    weeks = sorted(transactions['7d'].unique())
-    for week in tqdm(weeks):
-        week_data = transactions[transactions['7d'] == week]
-        customers = week_data['customer_id'].unique().tolist()
+    assert {'customer_id', 'article_id', 'week'}.issubset(transactions.columns), "transactions must have 'customer_id', 'article_id', 'week' columns"
+    assert {'customer_id', 'article_id', 'week'}.issubset(recommendations.columns), "recommendations must have 'customer_id', 'article_id', 'week' columns"
 
-        # Get recommendations for all customers for this week
-        recs = recommender(customers, week, k=k)
-
-        # Ensure columns for merge
-        recs = recs[['customer_id', 'article_id']].drop_duplicates()
-
-        # Merge to find which transactions were recommended
-        merged = week_data.merge(recs, on=['customer_id', 'article_id'], how='left', indicator=True)
-        covered = (merged['_merge'] == 'both').sum()
-        total = len(merged)
-        hit_rate_pct = covered / total if total > 0 else 0.0
-        results.append({'7d': week, 'covered': covered, 'total': total, 'percent': hit_rate_pct})
-    return pd.DataFrame(results) 
+    # Count total transactions per week
+    total_per_week = transactions.groupby('week').size().rename('total')
+    
+    # Count covered transactions per week using inner join
+    covered_per_week = (
+        transactions.merge(
+            recommendations, 
+            on=['customer_id', 'article_id', 'week'], 
+            how='inner'
+        ).groupby('week').size().rename('covered')
+    )
+    
+    # Combine and calculate percentage
+    results = pd.concat([total_per_week, covered_per_week], axis=1).fillna(0)
+    results['percent'] = results['covered'] / results['total']
+    
+    return results 
