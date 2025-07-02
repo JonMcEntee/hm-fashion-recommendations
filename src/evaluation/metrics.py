@@ -96,26 +96,23 @@ def hit_rate(recommendations: pd.DataFrame, transactions: pd.DataFrame, k: int =
         k (int, optional): Number of recommendations per customer (default: 100).
 
     Returns:
-        pd.DataFrame: DataFrame with columns ['covered', 'total', 'percent'] showing the hit_rate per week.
+        pd.DataFrame: DataFrame with columns ['week', 'covered', 'total', 'percent'] showing the hit_rate per week.
     """
-    # Ensure correct columns
-    assert {'customer_id', 'article_id', 'week'}.issubset(transactions.columns), "transactions must have 'customer_id', 'article_id', 'week' columns"
-    assert {'customer_id', 'article_id', 'week'}.issubset(recommendations.columns), "recommendations must have 'customer_id', 'article_id', 'week' columns"
+    assert {'customer_id', 'article_id', 'week'}.issubset(transactions.columns)
+    assert {'customer_id', 'article_id', 'week'}.issubset(recommendations.columns)
 
-    # Count total transactions per week
-    total_per_week = transactions.groupby('week').size().rename('total')
-    
-    # Count covered transactions per week using inner join
-    covered_per_week = (
-        transactions.merge(
-            recommendations, 
-            on=['customer_id', 'article_id', 'week'], 
-            how='inner'
-        ).groupby('week').size().rename('covered')
-    )
-    
-    # Combine and calculate percentage
-    results = pd.concat([total_per_week, covered_per_week], axis=1).fillna(0)
-    results['percent'] = results['covered'] / results['total']
-    
-    return results 
+    results = []
+    weeks = recommendations['week'].unique()
+    for week in tqdm(weeks, desc="Calculating hit_rate by week"):
+        trans_week = transactions[transactions['week'] == week]
+        rec_week = recommendations[recommendations['week'] == week]
+        # MultiIndex for this week
+        rec_index = pd.MultiIndex.from_frame(rec_week[['customer_id', 'article_id', 'week']])
+        trans_index = pd.MultiIndex.from_frame(trans_week[['customer_id', 'article_id', 'week']])
+        covered = trans_index.isin(rec_index)
+        covered_count = covered.sum()
+        total_count = len(trans_week)
+        percent = covered_count / total_count if total_count > 0 else 0
+        results.append({'week': week, 'covered': covered_count, 'total': total_count, 'percent': percent})
+
+    return pd.DataFrame(results)
