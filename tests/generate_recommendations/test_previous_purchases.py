@@ -20,6 +20,7 @@ def sample_transactions():
     
     data = {
         't_dat': dates,
+        'week': [0, 0, 1, 1, 1, 2],
         'customer_id': ['C1', 'C2', 'C1', 'C2', 'C1', 'C1'],
         'article_id': [1001, 1002, 1003, 1004, 1003, 1005]
     }

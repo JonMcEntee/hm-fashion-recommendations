@@ -11,7 +11,8 @@ def make_transactions(customers, article_ids, week_numbers=None, base_date=None)
     return pd.DataFrame({
         'customer_id': customers,
         'article_id': article_ids,
-        't_dat': t_dat
+        't_dat': t_dat,
+        'week': week_numbers
     })
 
 def test_basic_same_product_code():
@@ -22,7 +23,6 @@ def test_basic_same_product_code():
     transactions = make_transactions(['A', 'A'], [1, 1], week_numbers=[0, 1])
     same_code_finder = create_same_product_code(transactions, articles)
     result = same_code_finder(['A'], week=1, k=10)
-    print(result)
     assert set(result['article_id']) == {1, 2}
 
 def test_multiple_previous_purchases():

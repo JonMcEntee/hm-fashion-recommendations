@@ -40,8 +40,6 @@ def create_weekly_bestsellers_recommender(
         recommendations = recommender([customer1, customer2], week=10, k=12)
     """
     transactions = transactions.copy()
-    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
-    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
 
     # Precompute best sellers for all weeks upfront
     best_sellers = transactions.groupby("week")['article_id']\
@@ -102,11 +100,7 @@ def create_previous_purchases(
     Usage:
         recommender = create_previous_purchases(transactions_df)
         customer_history = recommender(['customer1', 'customer2'], week=10)
-    """
-    # Convert transaction dates to week numbers relative to the last week
-    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
-    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
-    
+    """    
     # Create a clean copy with only needed columns to minimize memory usage
     transactions = transactions[['customer_id', 'week', 'article_id', 't_dat']].copy()
 
@@ -171,14 +165,11 @@ def create_same_product_code(
     Usage:
         same_code_finder = create_same_product_code(articles_df)
         similar_articles = same_code_finder(previous_purchases_df)
-    """
-    # Convert transaction dates to week numbers relative to the last week
-    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
-    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
-    
+    """    
     # Create a clean copy with only needed columns to minimize memory usage
     transactions = transactions[['customer_id', 'week', 'article_id', 't_dat']].copy()
     
+    last_week = transactions['week'].max()
     transactions["time_decay"] = transactions["week"].apply(lambda x: 0.95 ** (last_week - x))
     weighted_transactions = transactions.groupby(['customer_id', 'article_id', 'week'])['time_decay'].agg('sum').reset_index()
     weighted_transactions['cumulative_weight'] = weighted_transactions\
@@ -189,6 +180,10 @@ def create_same_product_code(
     # Build an index mapping each article to its product code
     index = articles[['article_id', 'product_code']]\
         .copy()
+
+    article_to_product_code = index.set_index('article_id')['product_code'].to_dict()
+    product_code_to_article_ids = index.groupby('product_code')['article_id'].apply(list).to_dict()
+    similar_articles = {article_id: product_code_to_article_ids[article_to_product_code[article_id]] for article_id in index['article_id']}
     
     def same_product_code(customers: List[str], week: int, k: int = 12) -> pd.DataFrame:
         """
@@ -219,25 +214,16 @@ def create_same_product_code(
             .drop_duplicates()\
             .copy()
                 
-        previous_purchases = filtered_history[['customer_id', 'article_id']].copy()
+        same_code = filtered_history[['customer_id', 'article_id']].copy()
 
-        # Merge previous purchases with the index to get their product codes
-        previous_purchases = (
-            previous_purchases
-            .merge(index, on='article_id', how='inner') # Add product_code to previous purchases
-            .drop(columns=['article_id'], axis=1)       # Remove article_id, keep product_code
-            .drop_duplicates()                          # Remove duplicate product codes
-        )
-        # Find all articles that share any of these product codes
-        same_code = (
-            index
-            .merge(previous_purchases, on='product_code', how='inner') # Find all articles with these product codes
-            .drop(columns=['product_code'], axis=1)                    # Remove product_code for output
-        )
+        same_code["article_id"] = same_code["article_id"].map(similar_articles)
+
+        same_code = same_code.explode("article_id").astype({"article_id": "int32"})
 
         # Merge with weighted_transactions to add weights and time decay, filling missing values with 0
         same_code = (
             same_code
+            .drop_duplicates()
             .merge(weighted_transactions, on=['customer_id', 'article_id'], how='outer')
             .fillna({"time_decay": 0, "cumulative_weight": 0, "week": 0})
         )
@@ -348,9 +334,6 @@ def batch_generate_recommendations(
         None. Results are saved to file_path.
     """
     transactions = transactions.copy()
-    # Calculate the week number for each transaction
-    last_week = (transactions.t_dat.max() - transactions.t_dat.min()).days // 7
-    transactions['week'] = last_week - (transactions.t_dat.max() - transactions.t_dat).dt.days // 7
 
     # Iterate over each week in the specified range
     batch_recommendations = None
@@ -381,14 +364,34 @@ if __name__ == "__main__":
     print("Loading data...")
     transactions, articles, customers, customer_map, reverse_customer_map = load_data()
 
-    print("Generating weekly bestsellers...")
-    weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
-    batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True, to_csv=True)
+    print("Loading recommendations...")
+    recommendations = pd.read_csv("data/weekly_bestsellers.csv")
+    print("Calculating hit rate...")
+    df = hit_rate(recommendations, transactions)
+    df.to_csv("results/weekly_bestsellers_hit_rate.csv", index=False)
 
-    print("Generating previous purchases...")
-    previous_purchases = create_previous_purchases(transactions)
-    batch_generate_recommendations(transactions, previous_purchases, "data/previous_purchases.csv", verbose=True, to_csv=True)
+    print("Loading recommendations...")
+    recommendations = pd.read_csv("data/previous_purchases.csv")
+    print("Calculating hit rate...")
+    df = hit_rate(recommendations, transactions)
+    df.to_csv("results/previous_purchases_hit_rate.csv", index=False)
 
-    print("Generating same product code...")
-    same_product_code = create_same_product_code(transactions, articles)
-    batch_generate_recommendations(transactions, same_product_code, "data/same_product_code.csv", verbose=True, to_csv=True)
+    print("Loading recommendations...")
+    recommendations = pd.read_csv("data/same_product_code.csv")
+    print("Calculating hit rate...")
+    df = hit_rate(recommendations, transactions)
+    df.to_csv("results/same_product_code_hit_rate.csv", index=False)
+
+
+    # print("Generating weekly bestsellers...")
+    # weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
+    # batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True, to_csv=True)
+
+    # print("Generating previous purchases...")
+    # previous_purchases = create_previous_purchases(transactions)
+    # batch_generate_recommendations(transactions, previous_purchases, "data/previous_purchases.csv", verbose=True, to_csv=True)
+
+    # print("Generating same product code...")
+    # same_product_code = create_same_product_code(transactions, articles)
+    # batch_generate_recommendations(transactions, same_product_code, "data/same_product_code.csv", verbose=True, to_csv=True)
+
