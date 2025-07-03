@@ -243,6 +243,25 @@ def create_same_product_code(
 
     return same_product_code
 
+def create_item_similarity_recommender(
+    transactions: pd.DataFrame
+) -> Callable[[List[str], int, int], pd.DataFrame]:
+    item_user_matrix, user_map, item_map, reverse_user_map, reverse_item_map = \
+        create_user_item_matrix(transactions, last_week, train_window, matrix_type="uniform")
+
+    def item_similarity_recommender(previous_purchases: pd.DataFrame, week: int, k: int = 12) -> pd.DataFrame:
+        item_ids = previous_purchases['article_id'].unique()
+        similar_items = top_k_cosine_similarity(item_user_matrix, item_ids, k=k)
+        user_item_pairs = previous_purchases.merge(similar_items, on='article_id', how='left')\
+            .sort_values(by=['customer_id', 'similarity'], ascending=False)\
+            .groupby('customer_id', as_index=False)\
+            .head(k)
+
+        return user_item_pairs[['customer_id', 'article_id']]
+    
+    return item_similarity_recommender
+
+
 def create_recommendation_generator(
     transactions: pd.DataFrame,
     articles: pd.DataFrame
@@ -306,10 +325,11 @@ def create_recommendation_generator(
 
     return recommendation_generator
 
+
 def batch_generate_recommendations(
         transactions: pd.DataFrame,
-        recommender: Callable[[List[str], int, int], pd.DataFrame],
         file_path: str,
+        recommender: Callable[[List[str], int, int], pd.DataFrame] = None,
         k: int = 100,
         first_week: int = 50,
         verbose: bool = False,
@@ -364,34 +384,12 @@ if __name__ == "__main__":
     print("Loading data...")
     transactions, articles, customers, customer_map, reverse_customer_map = load_data()
 
-    print("Loading recommendations...")
-    recommendations = pd.read_csv("data/weekly_bestsellers.csv")
-    print("Calculating hit rate...")
-    df = hit_rate(recommendations, transactions)
-    df.to_csv("results/weekly_bestsellers_hit_rate.csv", index=False)
+    print("Generating same product code...")
+    same_product_code = create_same_product_code(transactions, articles)
+    batch_generate_recommendations(transactions, same_product_code, "data/same_product_code.csv", verbose=True, to_csv=True)
 
-    print("Loading recommendations...")
-    recommendations = pd.read_csv("data/previous_purchases.csv")
-    print("Calculating hit rate...")
-    df = hit_rate(recommendations, transactions)
-    df.to_csv("results/previous_purchases_hit_rate.csv", index=False)
-
-    print("Loading recommendations...")
-    recommendations = pd.read_csv("data/same_product_code.csv")
-    print("Calculating hit rate...")
-    df = hit_rate(recommendations, transactions)
-    df.to_csv("results/same_product_code_hit_rate.csv", index=False)
-
-
-    # print("Generating weekly bestsellers...")
-    # weekly_bestsellers = create_weekly_bestsellers_recommender(transactions)
-    # batch_generate_recommendations(transactions, weekly_bestsellers, "data/weekly_bestsellers.csv", verbose=True, to_csv=True)
-
-    # print("Generating previous purchases...")
-    # previous_purchases = create_previous_purchases(transactions)
-    # batch_generate_recommendations(transactions, previous_purchases, "data/previous_purchases.csv", verbose=True, to_csv=True)
-
-    # print("Generating same product code...")
-    # same_product_code = create_same_product_code(transactions, articles)
-    # batch_generate_recommendations(transactions, same_product_code, "data/same_product_code.csv", verbose=True, to_csv=True)
-
+    # print("Loading recommendations...")
+    # recommendations = pd.read_csv("data/weekly_bestsellers.csv")
+    # print("Calculating hit rate...")
+    # df = hit_rate(recommendations, transactions)
+    # df.to_csv("results/weekly_bestsellers_hit_rate.csv", index=False)
