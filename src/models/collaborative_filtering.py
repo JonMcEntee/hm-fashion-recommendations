@@ -65,11 +65,18 @@ def top_k_cosine_similarity(
 
     if type not in ["item", "user"]:
         raise ValueError("Type must be either 'item' or 'user'")
-
+    
+    for id in ids:
+        if id not in map_dict:
+            raise ValueError(f"{type} {id} not found in mapping")
+    
     transformed_ids = [map_dict[ob] for ob in ids if ob in map_dict]
 
     if type == "item":
         item_user_matrix = item_user_matrix.T.tocsr()
+
+    if k > len(map_dict):
+        raise ValueError(f"k ({k - 1}) is greater than the number of {type}s ({len(map_dict) - 1}) (not including the {type} itself)")
 
     if verbose:
         print("Reducing dimensions...")
@@ -88,8 +95,8 @@ def top_k_cosine_similarity(
 
     if verbose:
         print("Searching for top-K similar items...")
-    # D: cosine similarity scores, I: indices of top-K similar items
     query_vectors = vectors_reduced[transformed_ids]
+    # D: cosine similarity scores, I: indices of top-K similar items
     D, I = index.search(query_vectors, k)
 
     col_name = "article_id" if type == "item" else "customer_id"
