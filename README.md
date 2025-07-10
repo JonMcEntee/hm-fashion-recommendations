@@ -103,7 +103,7 @@ jupyter notebook HM_Fashion_Recommendations.ipynb
 - **Baselines:**
   - Global popularity, temporal popularity, random recommender
 - **Candidate Generation:**
-  - Combines previous purchases, similar product codes, and weekly bestsellers
+  - Combines various simple heuristics and collorative approaches to generate potential recommendation candidates.
 - **Feature Engineering:**
   - Automated via `FeatureGenerator` (see `src/features/feature_generator.py`)
 
