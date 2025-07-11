@@ -12,17 +12,18 @@ class Ensemble(CandidateGenerator):
         self.generators = {}
         for name, (generator, kwargs) in generators.items():
             self.generators[name] = generator(transactions, articles, **kwargs)
-            self.requirements.add(self.generators[name].requirements)
+            self.requirements.update(self.generators[name].requirements)
 
     def set_week(self, week: int) -> None:
-        for _, (generator, _) in self.generators.items():
+        self.week = week
+        for _, generator in self.generators.items():
             generator.set_week(week)
 
     def _generate(self, users: List[str], k: int) -> pd.DataFrame:
         recommendations = pd.DataFrame()
         self.context = {}
 
-        for name, (generator, _) in self.generators.items():
+        for name, generator in self.generators.items():
             for requirement in generator.requirements:
                 if requirement not in self.context:
                     raise ValueError((f"Requirement {requirement} for generator {name} "
@@ -34,7 +35,9 @@ class Ensemble(CandidateGenerator):
                 self.context[name] = new_recommendations
             recommendations = pd.concat([recommendations, new_recommendations])
 
-        return recommendations
+        recommendations = recommendations.sort_values(by="customer_id", ascending=False)
+
+        return recommendations.drop_duplicates().reset_index(drop=True)
 
 
 if __name__ == "__main__":
