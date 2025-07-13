@@ -7,7 +7,8 @@ class CandidateGenerator(ABC):
         self.transactions = transactions
         self.articles = articles
         self.week = None
-        self.context = None
+        self.context = {}
+        self.requirements = set()
 
     def set_context(self, context: dict):
         self.context = context
