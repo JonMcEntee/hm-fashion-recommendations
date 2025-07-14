@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 from typing import List, Callable, Dict, Tuple, Any
 from src.retrieval.candidate_generator import CandidateGenerator
 from tqdm import tqdm
@@ -41,10 +42,18 @@ class BatchGenerator:
             generator.set_week(week)
 
     def generate_batch(self, metrics: bool = False) -> pd.DataFrame:
-        coverage = pd.DataFrame(columns=["generator", "hit_rate"])
+        coverage = pd.DataFrame(columns=["generator", "hit_rate", "week"])
         recommendations = pd.DataFrame(columns=["customer_id", "article_id", "week"])
 
         if self.to_csv:
+            if self.overwrite:
+                os.remove(self.metrics_path)
+                os.remove(self.path)
+            elif os.path.exists(self.path):
+                raise FileExistsError(f"File {self.path} already exists. Set overwrite=True to overwrite.")
+            elif os.path.exists(self.metrics_path):
+                raise FileExistsError(f"File {self.metrics_path} already exists. Set overwrite=True to overwrite.")
+
             coverage.to_csv(self.metrics_path, index=False)
             recommendations.to_csv(self.path, index=False)
 
@@ -57,13 +66,13 @@ class BatchGenerator:
             coverage_['week'] = week
 
             if self.to_csv:
-                recommendations_.to_csv(self.path.format(week), index=False, header=False)
+                recommendations_.to_csv(self.path.format(week), mode='a', index=False, header=False)
             else:
                 recommendations = pd.concat([recommendations, recommendations_])
 
             if metrics:
                 if self.to_csv:
-                    coverage_.to_csv(self.metrics_path, index=False, header=False)
+                    coverage_.to_csv(self.metrics_path, mode='a', index=False, header=False)
                 else:
                     coverage = pd.concat([coverage, coverage_])
 
@@ -123,9 +132,9 @@ if __name__ == "__main__":
         generators,
         to_csv=True,
         verbose=True,
+        overwrite=True,
         path="data/recommendations.csv",
         metrics_path="results/metrics.csv"
     )
 
-    print("Generating recommendations...")
     batch_generator.generate_batch(metrics=True)
