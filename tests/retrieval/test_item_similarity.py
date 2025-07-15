@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from src.retrieval.item_similarity import ItemSimilarity
+from retrieval.item_similarity import ItemSimilarity
 
 def make_test_transactions():
     """Create test transaction data for item similarity tests."""

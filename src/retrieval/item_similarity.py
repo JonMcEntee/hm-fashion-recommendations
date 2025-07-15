@@ -9,9 +9,9 @@ who have purchased related items.
 The generator requires previous purchase recommendations as input.
 """
 
-from src.retrieval.candidate_generator import CandidateGenerator
-from src.retrieval.previous_purchases import PreviousPurchases
-from src.models.collaborative_filtering import create_user_item_matrix, top_k_cosine_similarity
+from retrieval.candidate_generator import CandidateGenerator
+from retrieval.previous_purchases import PreviousPurchases
+from models.collaborative_filtering import create_user_item_matrix, top_k_cosine_similarity
 import pandas as pd
 from typing import List
 
@@ -139,7 +139,7 @@ class ItemSimilarity(CandidateGenerator):
     
 if __name__ == "__main__":
     """Example usage of the ItemSimilarity candidate generator."""
-    from src.utils.data_load import load_data
+    from utils.data_load import load_data
     
     print("Loading data...")
     transactions, articles, _, customer_map, reverse_customer_map = load_data()

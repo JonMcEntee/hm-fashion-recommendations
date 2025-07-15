@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import pytest
-from src.features.feature_generator import FeatureGenerator, Feature, DerivativeFeature
+from features.feature_generator import FeatureGenerator, Feature, DerivativeFeature
 
 def mock_data():
     transactions = pd.DataFrame({

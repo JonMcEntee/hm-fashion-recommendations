@@ -17,9 +17,9 @@ import pickle
 from lightgbm import LGBMRanker
 from typing import List, Callable
 from sklearn.metrics import ndcg_score
-from src.evaluation.metrics import mapk
-from src.features.feature_generator import FeatureGenerator, Feature, DerivativeFeature, divide, subtract
-from src.models.generate_recommendations import create_recommendation_generator
+from evaluation.metrics import mapk
+from features.feature_generator import FeatureGenerator, Feature, DerivativeFeature, divide, subtract
+from models.generate_recommendations import create_recommendation_generator
 
 
 def train_ranker(

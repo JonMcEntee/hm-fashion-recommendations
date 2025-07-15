@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import scipy.sparse as sp
 from datetime import datetime, timedelta
-from src.models.collaborative_filtering import create_user_item_matrix, top_k_cosine_similarity
+from models.collaborative_filtering import create_user_item_matrix, top_k_cosine_similarity
 
 def make_test_transactions():
     """Create test transaction data for collaborative filtering tests."""

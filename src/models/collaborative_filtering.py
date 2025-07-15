@@ -113,7 +113,7 @@ def top_k_cosine_similarity(
     return similar
 
 if __name__ == "__main__":
-    from src.models.generate_recommendations import load_data
+    from models.generate_recommendations import load_data
     print("Loading data...")
     transactions, articles, customers, customer_map, reverse_customer_map = load_data()
     last_week = transactions['week'].max()

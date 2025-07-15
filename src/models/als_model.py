@@ -153,8 +153,8 @@ if __name__ == "__main__":
     import pickle
 
     # Import necessary modules    
-    from src.models.baseline_model import create_temporal_baseline
-    from src.evaluation.metrics import mapk
+    from models.baseline_model import create_temporal_baseline
+    from evaluation.metrics import mapk
     
     # Load and prepare data
     print("Loading data...")

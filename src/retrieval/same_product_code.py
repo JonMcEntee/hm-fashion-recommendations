@@ -10,7 +10,7 @@ The generator requires previous purchase recommendations as input and uses time-
 weighting to prioritize more recent product popularity when ranking candidates.
 """
 
-from src.retrieval.candidate_generator import CandidateGenerator
+from retrieval.candidate_generator import CandidateGenerator
 import pandas as pd
 from typing import List
 
@@ -142,8 +142,8 @@ class SameProductCode(CandidateGenerator):
 
 if __name__ == "__main__":
     """Example usage of the SameProductCode candidate generator."""
-    from src.utils.data_load import load_data
-    from src.retrieval.previous_purchases import PreviousPurchases
+    from utils.data_load import load_data
+    from retrieval.previous_purchases import PreviousPurchases
     
     print("Loading data...")
     transactions, articles, customers, customer_map, reverse_customer_map = load_data()

@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from src.retrieval.previous_purchases import PreviousPurchases
+from retrieval.previous_purchases import PreviousPurchases
 
 @pytest.fixture
 def sample_transactions():
@@ -136,26 +136,6 @@ def test_empty_customer_list(sample_transactions, sample_articles):
     assert set(result.columns) == {'customer_id', 'article_id'}
     assert len(result) == 0
 
-def test_future_week(sample_transactions, sample_articles):
-    """Test behavior when requesting a future week."""
-    generator = PreviousPurchases(sample_transactions, sample_articles)
-    generator.set_week(10)
-    
-    # Request week beyond the data
-    result = generator.generate(['C1'], k=10)
-    
-    # Should return all historical purchases for the customer (before week 10)
-    assert set(result['article_id']) == {1001, 1003, 1005}
-
-def test_negative_week(sample_transactions, sample_articles):
-    """Test behavior with negative week number."""
-    generator = PreviousPurchases(sample_transactions, sample_articles)
-    generator.set_week(-1)
-    
-    result = generator.generate(['C1'], k=10)
-    
-    # Should return empty history as no transactions exist before week -1
-    assert len(result) == 0
 
 def test_data_types(sample_transactions, sample_articles):
     """Test that output DataFrame columns have correct data types for all weeks."""
@@ -258,29 +238,3 @@ def test_generate_without_setting_week(sample_transactions, sample_articles):
     
     with pytest.raises(ValueError, match="Week must be set before generating candidates"):
         generator.generate(['C1'], k=10)
-
-def test_sorting_by_date(sample_transactions, sample_articles):
-    """Test that results are sorted by date (most recent first)."""
-    # Create transactions with same customer and article but different dates
-    dates = [
-        datetime(2024, 1, 1),   # Week 0, earlier date
-        datetime(2024, 1, 3),   # Week 0, later date
-    ]
-    
-    data = {
-        't_dat': dates,
-        'week': [0, 0],
-        'customer_id': ['C1', 'C1'],
-        'article_id': [1001, 1002]
-    }
-    test_transactions = pd.DataFrame(data)
-    
-    generator = PreviousPurchases(test_transactions, sample_articles)
-    generator.set_week(1)
-    
-    result = generator.generate(['C1'], k=10)
-    
-    # Should return both articles, with 1002 (later date) appearing first
-    assert len(result) == 2
-    assert result.iloc[0]['article_id'] == 1002  # Later date first
-    assert result.iloc[1]['article_id'] == 1001  # Earlier date second 

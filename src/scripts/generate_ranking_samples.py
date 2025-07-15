@@ -3,7 +3,7 @@ This script generates training samples for ranking models in the H&M Fashion Rec
 """
 import pandas as pd
 from tqdm import tqdm
-from src.models.generate_recommendations import create_recommendation_generator
+from models.generate_recommendations import create_recommendation_generator
 
 
 def generate_recommendations():

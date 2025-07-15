@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from src.retrieval.same_product_code import SameProductCode
+from retrieval.same_product_code import SameProductCode
 
 def make_transactions(customers, article_ids, week_numbers=None, base_date=None):
     """Helper function to create test transaction data."""

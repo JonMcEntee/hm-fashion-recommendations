@@ -6,9 +6,9 @@ This module provides a function to perform grid search for hyperparameter tuning
 
 import pandas as pd
 from typing import List, Dict, Any
-from src.models.als_model import create_als_recommender
-from src.models.baseline_model import create_temporal_baseline
-from src.evaluation.metrics import mapk
+from models.als_model import create_als_recommender
+from models.baseline_model import create_temporal_baseline
+from evaluation.metrics import mapk
 
 def run_als_grid_search(
     fitset: pd.DataFrame,

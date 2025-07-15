@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from src.models.generate_recommendations import create_weekly_bestsellers_recommender
+from models.generate_recommendations import create_weekly_bestsellers_recommender
 
 @pytest.fixture
 def sample_transactions():

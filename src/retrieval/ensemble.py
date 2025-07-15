@@ -8,7 +8,7 @@ context between them, and aggregates their outputs into a comprehensive set of
 recommendations.
 """
 
-from src.retrieval.candidate_generator import CandidateGenerator
+from retrieval.candidate_generator import CandidateGenerator
 import pandas as pd
 from typing import List, Dict, Tuple, Any
 
@@ -119,10 +119,10 @@ class Ensemble(CandidateGenerator):
 
 if __name__ == "__main__":
     """Example usage of the Ensemble candidate generator."""
-    from src.utils.data_load import load_data
-    from src.retrieval.previous_purchases import PreviousPurchases
-    from src.retrieval.same_product_code import SameProductCode
-    from src.retrieval.item_similarity import ItemSimilarity
+    from utils.data_load import load_data
+    from retrieval.previous_purchases import PreviousPurchases
+    from retrieval.same_product_code import SameProductCode
+    from retrieval.item_similarity import ItemSimilarity
 
     print("Loading data...")
     transactions, articles, _, _, _ = load_data()

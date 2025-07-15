@@ -1,6 +1,6 @@
 import pandas as pd
 from datetime import datetime, timedelta
-from src.models.generate_recommendations import create_same_product_code
+from models.generate_recommendations import create_same_product_code
 
 def make_transactions(customers, article_ids, week_numbers=None, base_date=None):
     if base_date is None:

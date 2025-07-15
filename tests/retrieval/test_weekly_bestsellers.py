@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from src.retrieval.weekly_bestsellers import WeeklyBestsellers
+from retrieval.weekly_bestsellers import WeeklyBestsellers
 
 @pytest.fixture
 def sample_transactions():
@@ -208,7 +208,7 @@ def test_generate_customer_article_structure(weekly_bestsellers):
 
 def test_inheritance_from_candidate_generator(weekly_bestsellers):
     """Test that WeeklyBestsellers properly inherits from CandidateGenerator."""
-    from src.retrieval.candidate_generator import CandidateGenerator
+    from retrieval.candidate_generator import CandidateGenerator
     
     assert isinstance(weekly_bestsellers, CandidateGenerator)
     assert hasattr(weekly_bestsellers, 'set_week')

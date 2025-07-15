@@ -1,7 +1,7 @@
 import pandas as pd
 import os
 from typing import List, Callable, Dict, Tuple, Any
-from src.retrieval.candidate_generator import CandidateGenerator
+from retrieval.candidate_generator import CandidateGenerator
 from tqdm import tqdm
 
 class BatchGenerator:
@@ -111,10 +111,10 @@ class BatchGenerator:
         return recommendation_batch, coverage
 
 if __name__ == "__main__":
-    from src.retrieval.previous_purchases import PreviousPurchases
-    from src.retrieval.same_product_code import SameProductCode
-    from src.retrieval.item_similarity import ItemSimilarity
-    from src.utils.data_load import load_data
+    from retrieval.previous_purchases import PreviousPurchases
+    from retrieval.same_product_code import SameProductCode
+    from retrieval.item_similarity import ItemSimilarity
+    from utils.data_load import load_data
 
     print("Loading data...")
     transactions, articles, customers, customer_map, reverse_customer_map = load_data()

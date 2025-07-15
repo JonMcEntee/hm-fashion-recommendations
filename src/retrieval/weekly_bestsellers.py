@@ -1,4 +1,4 @@
-from src.retrieval.candidate_generator import CandidateGenerator
+from retrieval.candidate_generator import CandidateGenerator
 import pandas as pd
 from typing import List
 
@@ -32,7 +32,7 @@ class WeeklyBestsellers(CandidateGenerator):
         })
 
 if __name__ == "__main__":
-    from src.utils.data_load import load_data
+    from utils.data_load import load_data
     print("Loading data...")
     transactions, articles, customers, customer_map, reverse_customer_map = load_data()
     print("Creating weekly bestsellers...")

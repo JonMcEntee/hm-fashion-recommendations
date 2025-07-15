@@ -1,6 +1,6 @@
 import pandas as pd
 import pytest
-from src.evaluation.metrics import hit_rate
+from evaluation.metrics import hit_rate
 
 def test_hit_rate_basic():
     recommendations = pd.DataFrame({

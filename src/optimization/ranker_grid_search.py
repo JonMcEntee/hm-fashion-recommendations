@@ -6,10 +6,10 @@ This module provides a function to perform grid search for hyperparameter tuning
 
 import pandas as pd
 import pickle
-from src.models.ranker_model import train_ranker, create_lgbm_recommender
-from src.models.generate_recommendations import create_recommendation_generator
-from src.features.feature_generator import FeatureGenerator, divide, subtract, Feature, DerivativeFeature
-from src.evaluation.metrics import mapk
+from models.ranker_model import train_ranker, create_lgbm_recommender
+from models.generate_recommendations import create_recommendation_generator
+from features.feature_generator import FeatureGenerator, divide, subtract, Feature, DerivativeFeature
+from evaluation.metrics import mapk
 
 def run_ranker_grid_search(
     train: pd.DataFrame,

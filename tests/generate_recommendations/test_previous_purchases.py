@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 from datetime import datetime, timedelta
-from src.models.generate_recommendations import create_previous_purchases
+from models.generate_recommendations import create_previous_purchases
 
 @pytest.fixture
 def sample_transactions():
