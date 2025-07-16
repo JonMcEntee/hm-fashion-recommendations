@@ -79,11 +79,12 @@ class ItemSimilarity(CandidateGenerator):
         self.week = week
         
         # Filter transactions to only include data before the target week
-        relevant_transactions = self.transactions[self.transactions["week"] < self.week]
+        relevant_transactions = self.transactions[(self.transactions["week"] < self.week) &\
+                                                  (self.transactions["week"] >= self.week - self.train_window)]
         
         # Create user-item matrix and mapping dictionaries for collaborative filtering
         self.item_user_matrix, self.user_map, self.item_map, self.reverse_user_map, self.reverse_item_map = \
-            create_user_item_matrix(relevant_transactions, self.week, self.train_window, self.matrix_type)
+            create_user_item_matrix(relevant_transactions, self.matrix_type)
     
     def _generate(self, users: List[str], k: int) -> pd.DataFrame:
         """

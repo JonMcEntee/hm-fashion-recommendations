@@ -8,13 +8,8 @@ from tqdm import tqdm
 
 def create_user_item_matrix(
     train: pd.DataFrame,
-    last_week: int,
-    train_window: int,
     matrix_type: str = "uniform"
 ) -> Tuple[sp.csr_matrix, Dict[str, int], Dict[str, int], Dict[int, str], Dict[int, str]]:
-    # Filter transactions to only include those within the specified training window
-    train = train[train['week'] <= last_week]
-    train = train[train['week'] >= last_week - train_window]
 
     # Create unique user and item lists
     user_ids = train['customer_id'].unique()
