@@ -123,6 +123,7 @@ if __name__ == "__main__":
     from retrieval.previous_purchases import PreviousPurchases
     from retrieval.same_product_code import SameProductCode
     from retrieval.item_similarity import ItemSimilarity
+    from retrieval.graph_search import GraphSearch
 
     print("Loading data...")
     transactions, articles, _, _, _ = load_data()
@@ -134,6 +135,10 @@ if __name__ == "__main__":
         "same_product_code": (SameProductCode, {}),
         "item_similarity": (ItemSimilarity, {"train_window": 25, "matrix_type": "uniform", "n_components": 1000})
     }
+
+    # generators = {
+    #     "graph_search": (GraphSearch, {"window": 25, "max_steps": 10})
+    # }
 
     print("Creating ensemble...")
     ensemble = Ensemble(transactions, articles, generators)
