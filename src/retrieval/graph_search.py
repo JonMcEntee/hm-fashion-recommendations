@@ -3,6 +3,7 @@ from models.collaborative_filtering import create_user_item_matrix
 from typing import List
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 
 class GraphSearch(CandidateGenerator):
     def __init__(self, transactions: pd.DataFrame, articles: pd.DataFrame, window: int = 25, max_steps: int = 10):
@@ -37,6 +38,7 @@ class GraphSearch(CandidateGenerator):
             item_graph * self.max_steps + \
             item_simularity * self.max_steps
 
+        current_similarity = item_simularity
         for i in range(self.max_steps - 1, 0, -1):
             current_similarity = current_similarity @ item_simularity
 
@@ -45,12 +47,14 @@ class GraphSearch(CandidateGenerator):
             else:
                 break
 
-            new_connections = current_similarity * (self.item_connections == 0)
+            new_connections = current_similarity.copy()
+            new_connections[self.item_connections > 0] = 0
             new_connections = (new_connections > 0).astype(int)
             self.item_connections +=\
                   new_connections * i + \
                   new_connections * current_similarity
 
+        print(self.item_connections)
 
 
     def _generate(self, users: List[str], k: int) -> pd.DataFrame:
@@ -68,7 +72,7 @@ if __name__ == "__main__":
     
     customers = transactions[transactions["week"] == 50]["customer_id"].unique()
     print("Creating graph search...")
-    graph_search = GraphSearch(transactions, articles, max_steps=10)
+    graph_search = GraphSearch(transactions, articles, max_steps=3)
     print("Setting week...")
     graph_search.set_week(50)
     print("Generating recommendations...")
