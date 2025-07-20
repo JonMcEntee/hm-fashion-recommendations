@@ -84,6 +84,9 @@ def test_one_step(sample_transactions, sample_articles):
 
     graph_search = GraphSearch(sample_transactions, sample_articles, max_steps=1)
     graph_search.set_week(1)
+    graph_search.set_context({
+        "previous_purchases": sample_transactions[["customer_id", "article_id"]]
+    })
     
     recommendations = graph_search.generate([user_map["user1"]], k=10)
     assert len(recommendations) == 1
@@ -103,6 +106,9 @@ def test_two_steps(sample_transactions, sample_articles):
 
     graph_search = GraphSearch(sample_transactions, sample_articles, max_steps=2)
     graph_search.set_week(2)
+    graph_search.set_context({
+        "previous_purchases": sample_transactions[["customer_id", "article_id"]]
+    })
 
     recommendations = graph_search.generate([user_map["user4"]], k=10)
     assert len(recommendations) == 2
@@ -119,6 +125,9 @@ def test_week_setting(sample_transactions, sample_articles):
 
     graph_search = GraphSearch(sample_transactions, sample_articles, max_steps=2)
     graph_search.set_week(1)
+    graph_search.set_context({
+        "previous_purchases": sample_transactions[["customer_id", "article_id"]]
+    })
 
     recommendations = graph_search.generate([user_map["user1"]], k=10)
     assert len(recommendations) == 1
@@ -147,6 +156,9 @@ def test_ranking(sample_transactions, sample_articles):
 
     graph_search = GraphSearch(sample_transactions, sample_articles, max_steps=1)
     graph_search.set_week(2)
+    graph_search.set_context({
+        "previous_purchases": sample_transactions[["customer_id", "article_id"]]
+    })
 
     recommendations = graph_search.generate([user_map["user3"]], k=10)
     assert recommendations["article_id"].iloc[0] == item_map["item2"]
