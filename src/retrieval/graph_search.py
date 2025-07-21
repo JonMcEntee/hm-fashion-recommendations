@@ -7,6 +7,10 @@ import scipy.sparse as sp
 from tqdm import tqdm
 
 class GraphSearch(CandidateGenerator):
+    """
+    Graph search is a retrieval method that uses a graph to find similar items.
+    """
+
     def __init__(self, transactions: pd.DataFrame, articles: pd.DataFrame, window: int = 25, max_steps: int = 10):
         super().__init__(transactions, articles)
         self.window = window
