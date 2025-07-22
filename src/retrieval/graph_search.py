@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 class GraphSearch(CandidateGenerator):
     """
-    Graph search is a retrieval method that uses a graph to find similar items.
+    Graph search is a retrieval method that uses a matrix representation of a graph to find similar items.
     """
 
     def __init__(self, transactions: pd.DataFrame, articles: pd.DataFrame, window: int = 25, max_steps: int = 10):
