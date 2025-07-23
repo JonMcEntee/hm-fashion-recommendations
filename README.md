@@ -23,6 +23,7 @@ hm-fashion-recommendations/
 │   ├── features/              # Feature engineering and transformation
 │   ├── evaluation/            # MAP@12 and APK metrics
 │   ├── optimization/          # Grid search for ALS and LightGBM
+│   ├── retrieval              # Candidate generation
 │   └── ...
 ├── data/                     # (Not included) Large CSVs from Kaggle
 ├── saved_models/              # Pickled models and feature generators

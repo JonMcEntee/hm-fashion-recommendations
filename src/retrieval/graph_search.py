@@ -7,9 +7,6 @@ import scipy.sparse as sp
 from tqdm import tqdm
 
 class GraphSearch(CandidateGenerator):
-    """
-    Graph search is a retrieval method that uses a matrix representation of a graph to find similar items.
-    """
 
     def __init__(self, transactions: pd.DataFrame, articles: pd.DataFrame, window: int = 25, max_steps: int = 10):
         super().__init__(transactions, articles)
@@ -33,85 +30,31 @@ class GraphSearch(CandidateGenerator):
         self.reverse_user_map = reverse_user_map
         self.reverse_item_map = reverse_item_map
 
-        item_simularity = (self.user_item_matrix.T @ self.user_item_matrix).tocsr()
-
-        users, *_ = item_simularity.nonzero()
-        users = list(users)
-        print(f"sparisfying matrix...")
-        item_simularity, users = self._sparsify_matrix(item_simularity, users, 500)
-
-        print(f"Matrix type:\n{type(item_simularity)}")
-        if (maximum := item_simularity.max()) > 0:
-            item_simularity = item_simularity / maximum
-
+        item_simularity = self.user_item_matrix.T @ self.user_item_matrix
         item_graph = (item_simularity > 0).astype(int)
 
-        self.item_connections = \
-            item_graph * self.max_steps + \
-            item_simularity * self.max_steps
+        users, *_ = item_graph.nonzero()
+        users = list(users)
 
-        print(f"item_similarity shape: {item_simularity.shape}")
-        print(f"item_similarity nnz: {item_simularity.nnz}")
-        print(f"item_similarity density: {item_simularity.nnz / (item_simularity.shape[0] * item_simularity.shape[1]):.6f}")
-
-
-        current_similarity = item_simularity
+        self.item_connections = item_graph
+        current_graph = item_graph
         for i in range(self.max_steps - 1, 0, -1):
             print(f"Step {i}... 1")
-            current_similarity = (current_similarity @ item_simularity).tocsr()
-            current_similarity, users = self._sparsify_matrix(current_similarity, users, 500)
-
-            print(f"Step {i}... 2")
-
-            if (maximum := current_similarity.max()) > 0:
-                current_similarity = current_similarity / maximum
-            else:
-                break
+            current_graph = current_graph @ item_graph
 
             print(f"Step {i}... 3")
-            new_connections = current_similarity.copy().tolil()
+            new_connections = current_graph.tolil()
             print(f"Step {i}... 4")
             new_connections[self.item_connections.nonzero()] = 0
             print(f"Step {i}... 5")
-            new_connections = new_connections.tocsr()
-            print(f"Step {i}... 6")
             new_connections.eliminate_zeros()
             print(f"Step {i}... 7")
             new_connections = (new_connections > 0).astype(int)
             print(f"Step {i}... 8")
-            self.item_connections +=\
-                  new_connections * i + \
-                  new_connections * current_similarity
-            print(f"Step {i}... Finished!")
-        
-    def _sparsify_matrix(
-            self,
-            matrix: sp.csr_matrix,
-            active_users: List[int],
-            k: int
-        ) -> Tuple[sp.csr_matrix, List[int]]:
-
-        new_matrix = sp.lil_matrix(matrix.shape, dtype=matrix.dtype)
-        
-        for user in active_users:
-            start = matrix.indptr[user]
-            end = matrix.indptr[user + 1]
-
-            if end > start:
-                row_data = matrix.data[start:end]
-                row_indices = matrix.indices[start:end]
-
-                if len(row_data) > k:
-                    top_k_indices = np.argsort(row_data)[-k:]
-                    row_data = row_data[top_k_indices]
-                    row_indices = row_indices[top_k_indices]
-                    active_users.remove(user)
-                
-                new_matrix[user, row_indices] = row_data
-        
-        return new_matrix.tocsr(), active_users
-
-            
+            self.item_connections += new_connections * i 
+            #NOTE: maybe need to use self.item_connections > 0 here?
+            current_graph = new_connections
+            print(f"Step {i}... Finished!")            
 
     def _generate(self, users: List[int], k: int) -> pd.DataFrame:
         result = self.context["previous_purchases"].copy()
